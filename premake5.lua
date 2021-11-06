@@ -134,9 +134,68 @@ project "lox"
       links {
          "Cocoa.framework",
          "IOKit.framework",
-         "c++",
+         "c",
         --  "tracy",
       }
 
-    --   filter "files:tiny/src/main.c"
+    --   filter "files:src/main.c"
     --      compileas "Objective-C"
+
+project "test"
+    kind "ConsoleApp"
+    language "C"
+    targetdir( "build" )
+    defines { 
+       "LOX_UNIT"
+    }
+ 
+    links {
+    }
+ 
+    libdirs {
+       "build"
+    }
+ 
+    sysincludedirs {
+    }
+ 
+    includedirs { 
+       "src"
+    }
+ 
+    files { 
+       "src/test/**.h",
+       "src/test/**.c",
+       "src/**_test.h",
+       "src/**_test.c",
+
+       -- tiny utils
+       "src/util/**.h",
+       "src/util/**.c",
+
+       -- tiny events
+       "src/events/**.h",
+       "src/events/**.c"
+       
+    }
+
+    -- ignore the lox main
+    removefiles {
+        "src/main.c"
+     }
+ 
+    filter { "system:macosx"}
+       links {
+          "c"
+       }
+    
+    filter { "system:linux"}
+       libdirs {
+          os.findlib("m"),
+          os.findlib("c")
+       }
+       links {
+          "c",
+          "m",
+          "pthread",
+       }

@@ -41,6 +41,9 @@ install-deps:
 run:
 	./build/${PROJECT_NAME}
 
+run-test:
+	./build/test
+
 gen: details
 ifeq (${THIS_OS},windows)
 	tools/windows/x86/premake5 vs2019 platform=windows
