@@ -152,6 +152,7 @@ project "test"
     }
  
     links {
+       "munit"
     }
  
     libdirs {
@@ -159,6 +160,7 @@ project "test"
     }
  
     sysincludedirs {
+       "ext"
     }
  
     includedirs { 
@@ -166,18 +168,8 @@ project "test"
     }
  
     files { 
-       "src/test/**.h",
-       "src/test/**.c",
-       "src/**_test.h",
-       "src/**_test.c",
-
-       -- tiny utils
-       "src/util/**.h",
-       "src/util/**.c",
-
-       -- tiny events
-       "src/events/**.h",
-       "src/events/**.c"
+       "src/**.h",
+       "src/**.c",
        
     }
 
@@ -201,3 +193,15 @@ project "test"
           "m",
           "pthread",
        }
+
+-- External Libraries
+
+project "munit"
+   kind "StaticLib"
+   language "C"
+   targetdir( "build" )
+
+   files { 
+      "ext/munit/**.h",
+      "ext/munit/**.c"
+   }
