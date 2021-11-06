@@ -50,7 +50,9 @@ filter "system:linux"
       "-std=c11", 
       "-D_POSIX_C_SOURCE=200112L",
       "-mcmodel=large",
-      "-fPIE"
+      "-fPIE",
+      "-Werror=return-type",
+      "-Werror=implicit-function-declaration"
    }
    defines {
       "LOX_LINUX"
