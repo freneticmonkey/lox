@@ -177,6 +177,15 @@ static void _number() {
     _emit_constant(NUMBER_VAL(number));
 }
 
+static void _string() {
+    _emit_constant(
+        OBJ_VAL(
+            l_copy_string(_parser.previous.start  + 1,
+                          _parser.previous.length - 2)
+        )
+    );
+}
+
 static void _unary() {
     TokenType operatorType = _parser.previous.type;
 
@@ -213,7 +222,7 @@ parse_rule_t rules[] = {
     [TOKEN_LESS]          = {NULL,     _binary,  PREC_COMPARISON},
     [TOKEN_LESS_EQUAL]    = {NULL,     _binary,  PREC_COMPARISON},
     [TOKEN_IDENTIFIER]    = {NULL,     NULL,     PREC_NONE},
-    [TOKEN_STRING]        = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_STRING]        = {_string,  NULL,     PREC_NONE},
     [TOKEN_NUMBER]        = {_number,  NULL,     PREC_NONE},
     [TOKEN_AND]           = {NULL,     NULL,     PREC_NONE},
     [TOKEN_CLASS]         = {NULL,     NULL,     PREC_NONE},

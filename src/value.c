@@ -1,5 +1,7 @@
 #include <stdio.h>
+#include <string.h>
 
+#include "object.h"
 #include "lib/memory.h"
 #include "value.h"
 
@@ -37,7 +39,29 @@ void l_print_value(value_t value)
         case VAL_NIL:
             printf("nil");
             break;
+        case VAL_OBJ: 
+            l_print_object(value); 
+            break;
         default:
             printf("unknown value type");
+    }
+}
+
+bool l_values_equal(value_t a, value_t b) {
+    if (a.type != b.type) 
+        return false;
+
+    switch (a.type) {
+        case VAL_BOOL:   return AS_BOOL(a) == AS_BOOL(b);
+        case VAL_NIL:    return true;
+        case VAL_NUMBER: return AS_NUMBER(a) == AS_NUMBER(b);
+        case VAL_OBJ: {
+            obj_string_t* aString = AS_STRING(a);
+            obj_string_t* bString = AS_STRING(b);
+            return aString->length == bString->length &&
+                memcmp(aString->chars, bString->chars,
+                        aString->length) == 0;
+        }
+        default:         return false; // Unreachable.
     }
 }

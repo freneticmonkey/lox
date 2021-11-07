@@ -1,21 +1,23 @@
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 
+#include "lib/memory.h"
 #include "lib/debug.h"
 #include "common.h"
 #include "compiler.h"
 #include "vm.h"
 
-vm_t _vm;
+vm_t vm;
 
 void           _push(value_t value);
 value_t        _pop();
 static value_t _peek(int distance);
 static bool    _is_falsey(value_t value);
-bool           _values_equal(value_t a, value_t b);
+static void    _concatenate();
 
 static void _reset_stack() {
-    _vm.stack_top = _vm.stack;
+    vm.stack_top = vm.stack;
 }
 
 static void _runtime_error(const char* format, ...) {
@@ -25,8 +27,8 @@ static void _runtime_error(const char* format, ...) {
     va_end(args);
     fputs("\n", stderr);
 
-    size_t instruction = _vm.ip - _vm.chunk->code - 1;
-    int line = _vm.chunk->lines[instruction];
+    size_t instruction = vm.ip - vm.chunk->code - 1;
+    int line = vm.chunk->lines[instruction];
     fprintf(stderr, "[line %d] in script\n", line);
     _reset_stack();
 }
@@ -34,15 +36,16 @@ static void _runtime_error(const char* format, ...) {
 
 void l_init_vm() {
     _reset_stack();
+    vm.objects = NULL;
 }
 
 void l_free_vm() {
-
+    l_free_objects();
 }
 
 static InterpretResult _run() {
-#define READ_BYTE() (*_vm.ip++)
-#define READ_CONSTANT() (_vm.chunk->constants.values[READ_BYTE()])
+#define READ_BYTE() (*vm.ip++)
+#define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
 #define BINARY_OP(valueType, op) \
     do { \
         if (!IS_NUMBER(_peek(0)) || !IS_NUMBER(_peek(1))) { \
@@ -58,14 +61,14 @@ static InterpretResult _run() {
 
 #ifdef DEBUG_TRACE_EXECUTION
         printf("          ");
-        for (value_t* slot = _vm.stack; slot < _vm.stack_top; slot++) {
+        for (value_t* slot = vm.stack; slot < vm.stack_top; slot++) {
             printf("[ ");
             l_print_value(*slot);
             printf(" ]");
         }
         printf("\n");
         
-        l_disassemble_instruction(_vm.chunk, (int)(_vm.ip - _vm.chunk->code));
+        l_disassemble_instruction(vm.chunk, (int)(vm.ip - vm.chunk->code));
 #endif
 
         uint8_t instruction;
@@ -81,12 +84,27 @@ static InterpretResult _run() {
             case OP_EQUAL: {
                 value_t b = _pop();
                 value_t a = _pop();
-                _push(BOOL_VAL(_values_equal(a, b)));
+                _push(BOOL_VAL(l_values_equal(a, b)));
                 break;
             }
             case OP_GREATER:  BINARY_OP(BOOL_VAL, >); break;
             case OP_LESS:     BINARY_OP(BOOL_VAL, <); break;
-            case OP_ADD:      BINARY_OP(NUMBER_VAL, +); break;
+            case OP_ADD: {
+                if (IS_STRING(_peek(0)) && IS_STRING(_peek(1))) {
+                    _concatenate();
+                } 
+                else if (IS_NUMBER(_peek(0)) && IS_NUMBER(_peek(1))) {
+                    double b = AS_NUMBER(_pop());
+                    double a = AS_NUMBER(_pop());
+                    _push(NUMBER_VAL(a + b));
+                } 
+                else {
+                    _runtime_error(
+                        "Operands must be two numbers or two strings.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                break;
+            }
             case OP_SUBTRACT: BINARY_OP(NUMBER_VAL, -); break;
             case OP_MULTIPLY: BINARY_OP(NUMBER_VAL, *); break;
             case OP_DIVIDE:   BINARY_OP(NUMBER_VAL, /); break;
@@ -121,8 +139,8 @@ InterpretResult l_interpret(const char* source) {
         return INTERPRET_COMPILE_ERROR;
     }
 
-    _vm.chunk = &chunk;
-    _vm.ip = _vm.chunk->code;
+    vm.chunk = &chunk;
+    vm.ip = vm.chunk->code;
 
     InterpretResult result = _run();
 
@@ -131,31 +149,33 @@ InterpretResult l_interpret(const char* source) {
 }
 
 void _push(value_t value) {
-    *_vm.stack_top = value;
-    _vm.stack_top++;
+    *vm.stack_top = value;
+    vm.stack_top++;
 }
 
 value_t _pop() {
-    _vm.stack_top--;
-    return *_vm.stack_top;
+    vm.stack_top--;
+    return *vm.stack_top;
 }
 
 static value_t _peek(int distance) {
-    return _vm.stack_top[-1 - distance];
+    return vm.stack_top[-1 - distance];
 }
 
 static bool _is_falsey(value_t value) {
     return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
 }
 
-bool _values_equal(value_t a, value_t b) {
-    if (a.type != b.type) 
-        return false;
+static void _concatenate() {
+    obj_string_t* b = AS_STRING(_pop());
+    obj_string_t* a = AS_STRING(_pop());
 
-    switch (a.type) {
-        case VAL_BOOL:   return AS_BOOL(a) == AS_BOOL(b);
-        case VAL_NIL:    return true;
-        case VAL_NUMBER: return AS_NUMBER(a) == AS_NUMBER(b);
-        default:         return false; // Unreachable.
-    }
+    int length = a->length + b->length;
+    char* chars = ALLOCATE(char, length + 1);
+    memcpy(chars, a->chars, a->length);
+    memcpy(chars + a->length, b->chars, b->length);
+    chars[length] = '\0';
+
+    obj_string_t* result = l_take_string(chars, length);
+    _push(OBJ_VAL(result));
 }
