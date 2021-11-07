@@ -1,10 +1,15 @@
 #include "common.h"
 #include "chunk.h"
+#include "version.h"
 #include "vm.h"
 #include "lib/debug.h"
 
 int main(int argc, const char* argv[]) {
-    printf("Starting lox ...\n");
+    printf("Starting lox %s ...\ncommit: %s\nbranch: %s\n", 
+        VERSION, 
+        COMMIT, 
+        BRANCH
+    );
 
     l_init_vm();
 

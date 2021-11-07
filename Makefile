@@ -1,4 +1,4 @@
-COMMIT=$(shell git rev-parse HEAD)
+COMMIT=$(shell git rev-parse --short HEAD)
 BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 
 PROJECT_NAME=lox
@@ -45,24 +45,34 @@ run-test:
 	./build/test
 
 gen: details
+# Updating the commit info in version.h
+# Generating build projects
 ifeq (${THIS_OS},windows)
+	./tools/windows/x86/ssed -i 's/<commit>/${COMMIT}/g' src/version.h
+	./tools/windows/x86/ssed -i 's/<branch>/${BRANCH}/g' src/version.h
 	tools/windows/x86/premake5 vs2019 platform=windows
 endif
 ifeq (${THIS_OS},darwin)
 	./tools/osx/x86/premake5 xcode4 platform=macosx
 endif
 ifeq (${THIS_OS},linux)
+	sed -i 's/<commit>/${COMMIT}/g' src/version.h
+	sed -i 's/<branch>/${BRANCH}/g' src/version.h
 ifeq (${THIS_ARCH},aarch64)
 	./tools/unix/arm/premake5 gmake platform=linuxARM64
 else
 	./tools/unix/x86/premake5 gmake platform=linux64
 endif
+
 endif
+
+post-build:
+	git checkout src/version.h
 
 open:
 	start .\projects\${PROJECT_NAME}.sln
 
-build-debug: gen
+binary-debug:
 ifeq (${THIS_OS},windows)
 	msbuild.exe ./projects/${PROJECT_NAME}.sln -p:Platform="windows";Configuration=Debug -target:${PROJECT_NAME}
 endif
@@ -73,7 +83,7 @@ ifeq (${THIS_OS},linux)
 	make -C projects ${PROJECT_NAME} config=debug_linux64
 endif
 
-build-release: gen
+binary-release: gen
 ifeq (${THIS_OS},windows)
 	msbuild.exe ./projects/${PROJECT_NAME}.sln -p:Platform="windows";Configuration=Release -target:${PROJECT_NAME}
 endif
@@ -94,6 +104,9 @@ endif
 ifeq (${THIS_OS},linux)
 	make -C projects test config=debug_linux64
 endif
+
+build-release: gen binary-release post-build
+build-debug: gen binary-debug post-build
 
 # by default build a debug binary
 build: build-debug
