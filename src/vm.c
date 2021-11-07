@@ -2,6 +2,7 @@
 
 #include "lib/debug.h"
 #include "common.h"
+#include "compiler.h"
 #include "vm.h"
 
 vm_t _vm;
@@ -68,10 +69,22 @@ static InterpretResult _run() {
 #undef BINARY_OP
 }
 
-InterpretResult l_interpret(chunk_t* chunk) {
-    _vm.chunk = chunk;
+InterpretResult l_interpret(const char* source) {
+    chunk_t chunk;
+    l_init_chunk(&chunk);
+
+    if (!l_compile(source, &chunk)) {
+        l_free_chunk(&chunk);
+        return INTERPRET_COMPILE_ERROR;
+    }
+
+    _vm.chunk = &chunk;
     _vm.ip = _vm.chunk->code;
-    return _run();
+
+    InterpretResult result = _run();
+
+    l_free_chunk(&chunk);
+    return result;
 }
 
 void l_push(Value value) {

@@ -23,7 +23,7 @@ typedef enum {
 void l_init_vm();
 void l_free_vm();
 
-InterpretResult l_interpret(chunk_t* chunk);
+InterpretResult l_interpret(const char * source);
 
 // VM Stack
 void  l_push(Value value);
