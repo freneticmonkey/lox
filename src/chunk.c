@@ -34,7 +34,7 @@ void l_write_chunk(chunk_t* chunk, uint8_t byte, int line)
     chunk->count++;
 }
 
-int l_add_constant(chunk_t* chunk, Value value) {
+int l_add_constant(chunk_t* chunk, value_t value) {
     l_write_value_array(&chunk->constants, value);
     // return the index of the new constant
     return chunk->constants.count - 1;

@@ -10,8 +10,8 @@
 typedef struct {
     chunk_t* chunk;
     uint8_t* ip;
-    Value    stack[STACK_MAX];
-    Value*   stack_top;
+    value_t  stack[STACK_MAX];
+    value_t* stack_top;
 } vm_t;
 
 typedef enum {
@@ -26,6 +26,6 @@ void l_free_vm();
 InterpretResult l_interpret(const char * source);
 
 // VM Stack
-void  l_push(Value value);
-Value l_pop();
+// void  l_push(Value value);
+// Value l_pop();
 #endif

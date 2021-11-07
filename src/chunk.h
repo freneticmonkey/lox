@@ -6,11 +6,18 @@
 
 typedef enum {
     OP_CONSTANT,
-    OP_NEGATE,
+    OP_NIL,
+    OP_TRUE,
+    OP_FALSE,
+    OP_EQUAL,
+    OP_GREATER,
+    OP_LESS,
     OP_ADD,
     OP_SUBTRACT,
     OP_MULTIPLY,
     OP_DIVIDE,
+    OP_NEGATE,
+    OP_NOT,
     OP_RETURN,
 } OpCode;
 
@@ -26,6 +33,6 @@ void l_init_chunk(chunk_t* chunk);
 void l_free_chunk(chunk_t* chunk);
 
 void l_write_chunk(chunk_t* chunk, uint8_t byte, int line);
-int  l_add_constant(chunk_t* chunk, Value value);
+int  l_add_constant(chunk_t* chunk, value_t value);
 
 #endif

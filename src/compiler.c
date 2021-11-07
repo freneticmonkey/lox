@@ -109,7 +109,7 @@ static void _emit_return() {
     _emit_byte(OP_RETURN);
 }
 
-static uint8_t _make_constant(Value value) {
+static uint8_t _make_constant(value_t value) {
     int constant = l_add_constant(_current_chunk(), value);
     if (constant > UINT8_MAX) {
         _error("Too many constants in one chunk.");
@@ -119,7 +119,7 @@ static uint8_t _make_constant(Value value) {
     return (uint8_t)constant;
 }
 
-static void _emit_constant(Value value) {
+static void _emit_constant(value_t value) {
     _emit_bytes(OP_CONSTANT, _make_constant(value));
 }
 
@@ -142,18 +142,26 @@ static void _binary() {
     _parse_precedence((Precedence)(rule->precedence + 1));
 
     switch (operatorType) {
-        case TOKEN_PLUS:  
-            _emit_byte(OP_ADD); 
-            break;
-        case TOKEN_MINUS: 
-            _emit_byte(OP_SUBTRACT); 
-            break;
-        case TOKEN_STAR:  
-            _emit_byte(OP_MULTIPLY); 
-            break;
-        case TOKEN_SLASH: 
-            _emit_byte(OP_DIVIDE); 
-            break;
+        case TOKEN_BANG_EQUAL:    _emit_bytes(OP_EQUAL, OP_NOT); break;
+        case TOKEN_EQUAL_EQUAL:   _emit_byte(OP_EQUAL); break;
+        case TOKEN_GREATER:       _emit_byte(OP_GREATER); break;
+        case TOKEN_GREATER_EQUAL: _emit_bytes(OP_LESS, OP_NOT); break;
+        case TOKEN_LESS:          _emit_byte(OP_LESS); break;
+        case TOKEN_LESS_EQUAL:    _emit_bytes(OP_GREATER, OP_NOT); break;
+        case TOKEN_PLUS:          _emit_byte(OP_ADD); break;
+        case TOKEN_MINUS:         _emit_byte(OP_SUBTRACT); break;
+        case TOKEN_STAR:          _emit_byte(OP_MULTIPLY); break;
+        case TOKEN_SLASH:         _emit_byte(OP_DIVIDE); break;
+        default: 
+            return; // Unreachable.
+    }
+}
+
+static void _literal() {
+    switch (_parser.previous.type) {
+        case TOKEN_FALSE: _emit_byte(OP_FALSE); break;
+        case TOKEN_NIL:   _emit_byte(OP_NIL); break;
+        case TOKEN_TRUE:  _emit_byte(OP_TRUE); break;
         default: 
             return; // Unreachable.
     }
@@ -165,8 +173,8 @@ static void _grouping() {
 }
 
 static void _number() {
-    double value = strtod(_parser.previous.start, NULL);
-    _emit_constant(value);
+    double number = strtod(_parser.previous.start, NULL);
+    _emit_constant(NUMBER_VAL(number));
 }
 
 static void _unary() {
@@ -177,55 +185,54 @@ static void _unary() {
 
     // Emit the operator instruction.
     switch (operatorType) {
-        case TOKEN_MINUS: 
-            _emit_byte(OP_NEGATE);
-            break;
+        case TOKEN_BANG:  _emit_byte(OP_NOT); break;
+        case TOKEN_MINUS: _emit_byte(OP_NEGATE); break;
         default: 
             return; // Unreachable.
     }
 }
 
 parse_rule_t rules[] = {
-    [TOKEN_LEFT_PAREN]    = {_grouping, NULL,   PREC_NONE},
-    [TOKEN_RIGHT_PAREN]   = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_LEFT_BRACE]    = {NULL,     NULL,   PREC_NONE}, 
-    [TOKEN_RIGHT_BRACE]   = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_COMMA]         = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_DOT]           = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_MINUS]         = {_unary,   _binary, PREC_TERM},
-    [TOKEN_PLUS]          = {NULL,     _binary, PREC_TERM},
-    [TOKEN_SEMICOLON]     = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_SLASH]         = {NULL,     _binary, PREC_FACTOR},
-    [TOKEN_STAR]          = {NULL,     _binary, PREC_FACTOR},
-    [TOKEN_BANG]          = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_BANG_EQUAL]    = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_EQUAL]         = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_EQUAL_EQUAL]   = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_GREATER]       = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_GREATER_EQUAL] = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_LESS]          = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_LESS_EQUAL]    = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_IDENTIFIER]    = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_STRING]        = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_NUMBER]        = {_number,   NULL,   PREC_NONE},
-    [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_CLASS]         = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_ELSE]          = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_FALSE]         = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_FOR]           = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_FUN]           = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_IF]            = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_NIL]           = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_OR]            = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_PRINT]         = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_RETURN]        = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_SUPER]         = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_THIS]          = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_TRUE]          = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_VAR]           = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_WHILE]         = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_ERROR]         = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_EOF]           = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_LEFT_PAREN]    = {_grouping, NULL,    PREC_NONE},
+    [TOKEN_RIGHT_PAREN]   = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_LEFT_BRACE]    = {NULL,     NULL,     PREC_NONE}, 
+    [TOKEN_RIGHT_BRACE]   = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_COMMA]         = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_DOT]           = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_MINUS]         = {_unary,   _binary,  PREC_TERM},
+    [TOKEN_PLUS]          = {NULL,     _binary,  PREC_TERM},
+    [TOKEN_SEMICOLON]     = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_SLASH]         = {NULL,     _binary,  PREC_FACTOR},
+    [TOKEN_STAR]          = {NULL,     _binary,  PREC_FACTOR},
+    [TOKEN_BANG]          = {_unary,   NULL,     PREC_NONE},
+    [TOKEN_BANG_EQUAL]    = {NULL,     _binary,  PREC_EQUALITY},
+    [TOKEN_EQUAL]         = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_EQUAL_EQUAL]   = {NULL,     _binary,  PREC_EQUALITY},
+    [TOKEN_GREATER]       = {NULL,     _binary,  PREC_COMPARISON},
+    [TOKEN_GREATER_EQUAL] = {NULL,     _binary,  PREC_COMPARISON},
+    [TOKEN_LESS]          = {NULL,     _binary,  PREC_COMPARISON},
+    [TOKEN_LESS_EQUAL]    = {NULL,     _binary,  PREC_COMPARISON},
+    [TOKEN_IDENTIFIER]    = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_STRING]        = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_NUMBER]        = {_number,  NULL,     PREC_NONE},
+    [TOKEN_AND]           = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_CLASS]         = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_ELSE]          = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_FALSE]         = {_literal, NULL,     PREC_NONE},
+    [TOKEN_FOR]           = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_FUN]           = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_IF]            = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_NIL]           = {_literal, NULL,     PREC_NONE},
+    [TOKEN_OR]            = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_PRINT]         = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_RETURN]        = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_SUPER]         = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_THIS]          = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_TRUE]          = {_literal, NULL,     PREC_NONE},
+    [TOKEN_VAR]           = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_WHILE]         = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_ERROR]         = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_EOF]           = {NULL,     NULL,     PREC_NONE},
 };
 
 static void _parse_precedence(Precedence precedence) {
