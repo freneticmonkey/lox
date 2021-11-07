@@ -3,6 +3,7 @@
 
 //#include "common.h"
 #include "chunk.h"
+#include "table.h"
 #include "value.h"
 
 #define STACK_MAX 256
@@ -12,6 +13,7 @@ typedef struct {
     uint8_t* ip;
     value_t  stack[STACK_MAX];
     value_t* stack_top;
+    table_t  strings;
     obj_t*   objects;
 } vm_t;
 
@@ -29,7 +31,4 @@ void l_free_vm();
 
 InterpretResult l_interpret(const char * source);
 
-// VM Stack
-// void  l_push(Value value);
-// Value l_pop();
 #endif

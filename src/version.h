@@ -2,7 +2,7 @@
 #define LOX_VERSION_H
 
 static const char * VERSION = "0.0.1";
-static const char * COMMIT = "<commit>";
-static const char * BRANCH = "<branch>";
+static const char * COMMIT = "788b444";
+static const char * BRANCH = "main";
 
 #endif

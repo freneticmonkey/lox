@@ -37,9 +37,11 @@ static void _runtime_error(const char* format, ...) {
 void l_init_vm() {
     _reset_stack();
     vm.objects = NULL;
+    l_init_table(&vm.strings);
 }
 
 void l_free_vm() {
+    l_free_table(&vm.strings);
     l_free_objects();
 }
 

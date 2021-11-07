@@ -14,14 +14,15 @@ typedef enum {
 } ObjType;
 
 struct obj_t{
-    ObjType type;
+    ObjType       type;
     struct obj_t* next;
 };
 
 struct obj_string_t {
-  obj_t obj;
-  int   length;
-  char* chars;
+    obj_t    obj;
+    int      length;
+    char*    chars;
+    uint32_t hash;
 };
 
 obj_string_t* l_take_string(char* chars, int length);
