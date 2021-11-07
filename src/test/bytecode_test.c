@@ -22,7 +22,7 @@ static MunitResult _chunk_compare(const MunitParameter params[], void *user_data
     chunk_t chunk;
     l_init_chunk(&chunk);
 
-    int constant = l_add_constant(&chunk, 1.2);
+    int constant = l_add_constant(&chunk, NUMBER_VAL(1.2));
     l_write_chunk(&chunk, OP_CONSTANT, 1);
     l_write_chunk(&chunk, constant, 1);
     l_write_chunk(&chunk, OP_RETURN, 1);
