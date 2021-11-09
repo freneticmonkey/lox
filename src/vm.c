@@ -37,17 +37,20 @@ static void _runtime_error(const char* format, ...) {
 void l_init_vm() {
     _reset_stack();
     vm.objects = NULL;
+    l_init_table(&vm.globals);
     l_init_table(&vm.strings);
 }
 
 void l_free_vm() {
     l_free_table(&vm.strings);
+    l_free_table(&vm.globals);
     l_free_objects();
 }
 
 static InterpretResult _run() {
 #define READ_BYTE() (*vm.ip++)
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
+#define READ_STRING() AS_STRING(READ_CONSTANT())
 #define BINARY_OP(valueType, op) \
     do { \
         if (!IS_NUMBER(_peek(0)) || !IS_NUMBER(_peek(1))) { \
@@ -83,6 +86,32 @@ static InterpretResult _run() {
             case OP_NIL:      _push(NIL_VAL); break;
             case OP_TRUE:     _push(BOOL_VAL(true)); break;
             case OP_FALSE:    _push(BOOL_VAL(false)); break;
+            case OP_POP:      _pop(); break;
+            case OP_GET_GLOBAL: {
+                obj_string_t* name = READ_STRING();
+                value_t value;
+                if (!l_table_get(&vm.globals, name, &value)) {
+                    _runtime_error("Undefined variable '%s'.", name->chars);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                _push(value);
+                break;
+            }
+            case OP_DEFINE_GLOBAL: {
+                obj_string_t* name = READ_STRING();
+                l_table_set(&vm.globals, name, _peek(0));
+                _pop();
+                break;
+            }
+            case OP_SET_GLOBAL: {
+                obj_string_t* name = READ_STRING();
+                if (l_table_set(&vm.globals, name, _peek(0))) {
+                    l_table_delete(&vm.globals, name); 
+                    _runtime_error("Undefined variable '%s'.", name->chars);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                break;
+            }
             case OP_EQUAL: {
                 value_t b = _pop();
                 value_t a = _pop();
@@ -119,15 +148,19 @@ static InterpretResult _run() {
                 _push(NUMBER_VAL(-AS_NUMBER(_pop())));
                 break;
             }
-            case OP_RETURN: {
+            case OP_PRINT: {
                 l_print_value(_pop());
                 printf("\n");
+                break;
+            }
+            case OP_RETURN: {
                 return INTERPRET_OK;
             }
         }
     }
 
 #undef READ_BYTE
+#undef READ_STRING
 #undef READ_CONSTANT
 #undef BINARY_OP
 }

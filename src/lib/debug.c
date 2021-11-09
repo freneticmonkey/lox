@@ -46,6 +46,14 @@ int l_disassemble_instruction(chunk_t* chunk, int offset) {
             return _simple_instruction("OP_TRUE", offset);
         case OP_FALSE:
             return _simple_instruction("OP_FALSE", offset);
+        case OP_POP:
+            return _simple_instruction("OP_POP", offset);
+        case OP_GET_GLOBAL:
+            return _constant_instruction("OP_GET_GLOBAL", chunk, offset);
+        case OP_DEFINE_GLOBAL:
+            return _constant_instruction("OP_DEFINE_GLOBAL", chunk, offset);
+        case OP_SET_GLOBAL:
+            return _constant_instruction("OP_SET_GLOBAL", chunk, offset);
         case OP_EQUAL:
             return _simple_instruction("OP_EQUAL", offset);
         case OP_GREATER:
@@ -64,6 +72,8 @@ int l_disassemble_instruction(chunk_t* chunk, int offset) {
             return _simple_instruction("OP_NOT", offset);
         case OP_NEGATE:
             return _simple_instruction("OP_NEGATE", offset);
+        case OP_PRINT:
+            return _simple_instruction("OP_PRINT", offset);
         default:
             printf("Unknown opcode %d\n", instruction);
             return offset + 1;
