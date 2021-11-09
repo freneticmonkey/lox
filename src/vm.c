@@ -87,6 +87,16 @@ static InterpretResult _run() {
             case OP_TRUE:     _push(BOOL_VAL(true)); break;
             case OP_FALSE:    _push(BOOL_VAL(false)); break;
             case OP_POP:      _pop(); break;
+            case OP_GET_LOCAL: {
+                uint8_t slot = READ_BYTE();
+                _push(vm.stack[slot]); 
+                break;
+            }
+            case OP_SET_LOCAL: {
+                uint8_t slot = READ_BYTE();
+                vm.stack[slot] = _peek(0);
+                break;
+            }
             case OP_GET_GLOBAL: {
                 obj_string_t* name = READ_STRING();
                 value_t value;
