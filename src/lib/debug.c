@@ -30,6 +30,13 @@ static int _byte_instruction(const char* name, chunk_t* chunk, int offset) {
     return offset + 2; 
 }
 
+static int _jump_instruction(const char* name, int sign, chunk_t* chunk, int offset) {
+    uint16_t jump = (uint16_t)(chunk->code[offset + 1] << 8);
+    jump |= chunk->code[offset + 2];
+    printf("%-16s %4d -> %d\n", name, offset, (offset + 3 + sign * jump) );
+    return offset + 3;
+}
+
 int l_disassemble_instruction(chunk_t* chunk, int offset) {
     printf("%04d ", offset);
 
@@ -42,8 +49,7 @@ int l_disassemble_instruction(chunk_t* chunk, int offset) {
 
     uint8_t instruction = chunk->code[offset];
     switch (instruction) {
-        case OP_RETURN:
-            return _simple_instruction("OP_RETURN", offset);
+        
         case OP_CONSTANT:
             return _constant_instruction("OP_CONSTANT", chunk, offset);
         case OP_NIL:
@@ -84,6 +90,14 @@ int l_disassemble_instruction(chunk_t* chunk, int offset) {
             return _simple_instruction("OP_NEGATE", offset);
         case OP_PRINT:
             return _simple_instruction("OP_PRINT", offset);
+        case OP_JUMP:
+            return _jump_instruction("OP_JUMP", 1, chunk, offset);
+        case OP_JUMP_IF_FALSE:
+            return _jump_instruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
+        case OP_LOOP:
+            return _jump_instruction("OP_LOOP", -1, chunk, offset);
+        case OP_RETURN:
+            return _simple_instruction("OP_RETURN", offset);
         default:
             printf("Unknown opcode %d\n", instruction);
             return offset + 1;

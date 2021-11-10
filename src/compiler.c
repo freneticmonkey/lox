@@ -130,6 +130,24 @@ static void _emit_bytes(uint8_t byte1, uint8_t byte2) {
     _emit_byte(byte2);
 }
 
+static void _emit_loop(int loopStart) {
+    _emit_byte(OP_LOOP);
+
+    int offset = _current_chunk()->count - loopStart + 2;
+    if (offset > UINT16_MAX) 
+        _error("Loop body too large.");
+
+    _emit_byte((offset >> 8) & 0xff);
+    _emit_byte(offset & 0xff);
+}
+
+static int _emit_jump(uint8_t instruction) {
+    _emit_byte(instruction);
+    _emit_byte(0xff);
+    _emit_byte(0xff);
+    return _current_chunk()->count - 2;
+}
+
 static void _emit_return() {
     _emit_byte(OP_RETURN);
 }
@@ -146,6 +164,18 @@ static uint8_t _make_constant(value_t value) {
 
 static void _emit_constant(value_t value) {
     _emit_bytes(OP_CONSTANT, _make_constant(value));
+}
+
+static void _patch_jump(int offset) {
+    // -2 to adjust for the bytecode for the jump offset itself.
+    int jump = _current_chunk()->count - offset - 2;
+
+    if (jump > UINT16_MAX) {
+        _error("Too much code to jump over.");
+    }
+
+    _current_chunk()->code[offset] = (jump >> 8) & 0xff;
+    _current_chunk()->code[offset + 1] = jump & 0xff;
 }
 
 static void l_init_compiler(compiler_t* compiler) {
@@ -259,6 +289,15 @@ static void _define_variable(uint8_t global) {
     _emit_bytes(OP_DEFINE_GLOBAL, global);
 }
 
+static void _and_(bool canAssign) {
+    int endJump = _emit_jump(OP_JUMP_IF_FALSE);
+
+    _emit_byte(OP_POP);
+    _parse_precedence(PREC_AND);
+
+    _patch_jump(endJump);
+}
+
 static void _binary(bool canAssign) {
     TokenType operatorType = _parser.previous.type;
     parse_rule_t* rule = _get_rule(operatorType);
@@ -300,6 +339,17 @@ static void _number(bool canAssign) {
     _emit_constant(NUMBER_VAL(number));
 }
 
+static void _or_(bool canAssign) {
+    int elseJump = _emit_jump(OP_JUMP_IF_FALSE);
+    int endJump = _emit_jump(OP_JUMP);
+
+    _patch_jump(elseJump);
+    _emit_byte(OP_POP);
+
+    _parse_precedence(PREC_OR);
+    _patch_jump(endJump);
+}
+
 static void _string(bool canAssign) {
     _emit_constant(
         OBJ_VAL(
@@ -323,9 +373,9 @@ static void _named_variable(token_t name, bool canAssign) {
 
     if (canAssign && _match(TOKEN_EQUAL)) {
         _expression();
-        _emit_bytes(OP_SET_GLOBAL, (uint8_t)arg);
+        _emit_bytes(setOp, (uint8_t)arg);
     } else {
-        _emit_bytes(OP_GET_GLOBAL, (uint8_t)arg);
+        _emit_bytes(getOp, (uint8_t)arg);
     }
 }
 
@@ -371,7 +421,7 @@ parse_rule_t rules[] = {
     [TOKEN_IDENTIFIER]    = {_variable,NULL,     PREC_NONE},
     [TOKEN_STRING]        = {_string,  NULL,     PREC_NONE},
     [TOKEN_NUMBER]        = {_number,  NULL,     PREC_NONE},
-    [TOKEN_AND]           = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_AND]           = {NULL,     _and_,    PREC_AND},
     [TOKEN_CLASS]         = {NULL,     NULL,     PREC_NONE},
     [TOKEN_ELSE]          = {NULL,     NULL,     PREC_NONE},
     [TOKEN_FALSE]         = {_literal, NULL,     PREC_NONE},
@@ -379,7 +429,7 @@ parse_rule_t rules[] = {
     [TOKEN_FUN]           = {NULL,     NULL,     PREC_NONE},
     [TOKEN_IF]            = {NULL,     NULL,     PREC_NONE},
     [TOKEN_NIL]           = {_literal, NULL,     PREC_NONE},
-    [TOKEN_OR]            = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_OR]            = {NULL,     _or_,     PREC_OR},
     [TOKEN_PRINT]         = {NULL,     NULL,     PREC_NONE},
     [TOKEN_RETURN]        = {NULL,     NULL,     PREC_NONE},
     [TOKEN_SUPER]         = {NULL,     NULL,     PREC_NONE},
@@ -450,10 +500,102 @@ static void _expression_statement() {
     _emit_byte(OP_POP);
 }
 
+static void _for_statement() {
+    _begin_scope();
+
+    _consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
+
+    // Process initializer + expression
+    if (_match(TOKEN_SEMICOLON)) {
+        // No initializer.
+    } else if (_match(TOKEN_VAR)) {
+        _var_declaration();
+    } else {
+        _expression_statement();
+    }
+    
+    int loopStart = _current_chunk()->count;
+    
+    // Process the for exit condition
+    int exitJump = -1;
+    if (!_match(TOKEN_SEMICOLON)) {
+        _expression();
+        _consume(TOKEN_SEMICOLON, "Expect ';' after loop condition.");
+
+        // Jump out of the loop if the condition is false.
+        exitJump = _emit_jump(OP_JUMP_IF_FALSE);
+        _emit_byte(OP_POP); // Condition.
+    }
+
+    // process the increment
+
+    if (!_match(TOKEN_RIGHT_PAREN)) {
+        int bodyJump = _emit_jump(OP_JUMP);
+        int incrementStart = _current_chunk()->count;
+        _expression();
+        _emit_byte(OP_POP);
+        _consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
+
+        _emit_loop(loopStart);
+        loopStart = incrementStart;
+        _patch_jump(bodyJump);
+    }
+    
+    _statement();
+    _emit_loop(loopStart);
+
+    if (exitJump != -1) {
+        _patch_jump(exitJump);
+        _emit_byte(OP_POP); // Condition.
+    }
+
+    _end_scope();
+}
+
+static void _if_statement() {
+    // process the logical expression
+    _consume(TOKEN_LEFT_PAREN, "Expect '(' after 'if'.");
+    _expression();
+    _consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition."); 
+
+    // run the 'then' statement
+    int thenJump = _emit_jump(OP_JUMP_IF_FALSE);
+    _emit_byte(OP_POP);
+    _statement();
+
+    // finshed then - jump over the 'else' statement
+    int elseJump = _emit_jump(OP_JUMP);
+
+    // otherwise run the 'else' statement
+    _patch_jump(thenJump);
+    _emit_byte(OP_POP);
+
+    if (_match(TOKEN_ELSE))
+        _statement();
+    
+    // set the post if statement jump point
+    _patch_jump(elseJump);
+}
+
 static void _print_statement() {
     _expression();
     _consume(TOKEN_SEMICOLON, "Expect ';' after value.");
     _emit_byte(OP_PRINT);
+}
+
+static void _while_statement() {
+    int loopStart = _current_chunk()->count;
+    _consume(TOKEN_LEFT_PAREN, "Expect '(' after 'while'.");
+    _expression();
+    _consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
+
+    int exitJump = _emit_jump(OP_JUMP_IF_FALSE);
+    _emit_byte(OP_POP);
+    _statement();
+    _emit_loop(loopStart);
+
+    _patch_jump(exitJump);
+    _emit_byte(OP_POP);
 }
 
 static void _synchronize() {
@@ -498,6 +640,12 @@ static void _declaration() {
 static void _statement() {
     if ( _match(TOKEN_PRINT) ) {
         _print_statement();
+    } else if ( _match(TOKEN_IF) ) {
+        _if_statement();
+    } else if ( _match(TOKEN_WHILE) ) {
+        _while_statement();
+    } else if ( _match(TOKEN_FOR) ) {
+        _for_statement();
     } else if ( _match(TOKEN_LEFT_BRACE) ) {
         _begin_scope();
         _block();

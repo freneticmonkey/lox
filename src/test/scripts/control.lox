@@ -1,0 +1,28 @@
+var true_val = true;
+
+print "Testing If Statements";
+
+if (true_val) {
+    print "true_val is true";
+} else {
+    print "true_val is NOT true. Errror!";
+}
+
+if (true_val == false) {
+    print "true_val == false. Error!";
+} else {
+    print "true_val != false";
+}
+
+print "Testing While";
+var initial = 0;
+
+while (initial < 10) {
+    initial = initial + 1;
+    print initial;
+}
+
+print "Testing For";
+for (var i = 0; i < 10; i = i + 1) {
+    print i;
+}
