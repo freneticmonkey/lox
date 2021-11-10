@@ -20,3 +20,18 @@ implementation of the lox interpreter as described on http://craftinginterpreter
 [ ] local var aliasing across scopes
 [ ] duplicate variable definition
 [ ] File parsing
+
+## Future Language features
+[ ] Defer
+[ ] Switch statements
+[ ] bracketless expressions
+[ ] ternary operator
+[ ] remove semi-colon line ending
+[ ] multi-line comment blocks
+[ ] for-in container iteration
+[ ] remove global variables
+
+## Advanced language features
+[ ] interfaces
+[ ] coroutines
+
