@@ -30,8 +30,12 @@ implementation of the lox interpreter as described on http://craftinginterpreter
 [ ] multi-line comment blocks
 [ ] for-in container iteration
 [ ] remove global variables
+[ ] impl break
+[ ] impl continue
+[ ] run scripts from repl
 
 ## Advanced language features
 [ ] interfaces
 [ ] coroutines
+[ ] Debugger?
 
