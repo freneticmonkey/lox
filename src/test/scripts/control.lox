@@ -1,11 +1,12 @@
 var true_val = true;
+var false_val = false;
 
 print "Testing If Statements";
 
 if (true_val) {
     print "true_val is true";
 } else {
-    print "true_val is NOT true. Errror!";
+    print "true_val is NOT true. Error!";
 }
 
 if (true_val == false) {
@@ -13,6 +14,31 @@ if (true_val == false) {
 } else {
     print "true_val != false";
 }
+
+if (true_val and false_val) {
+    print "true_val and false_val. Error!";
+} else {
+    print "true_val and false_val. Success";
+}
+
+if (true_val and true_val) {
+    print "true_val and true_val. Success!";
+} else {
+    print "true_val and true_val. Error";
+}
+
+if (true_val or false_val) {
+    print "true_val or false_val. Success";
+} else {
+    print "true_val or false_val. Error!";
+}
+
+if (false_val or false_val) {
+    print "false_val or false_val. Error";
+} else {
+    print "false_val or false_val. Success!";
+}
+
 
 print "Testing While";
 var initial = 0;
