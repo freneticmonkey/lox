@@ -6,6 +6,6 @@
 
 #include "chunk.h"
 
-bool l_compile(const char* source, chunk_t *chunk);
+obj_function_t* l_compile(const char* source);
 
 #endif

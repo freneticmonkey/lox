@@ -96,6 +96,8 @@ int l_disassemble_instruction(chunk_t* chunk, int offset) {
             return _jump_instruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
         case OP_LOOP:
             return _jump_instruction("OP_LOOP", -1, chunk, offset);
+        case OP_CALL:
+            return _byte_instruction("OP_CALL", chunk, offset);
         case OP_RETURN:
             return _simple_instruction("OP_RETURN", offset);
         default:
