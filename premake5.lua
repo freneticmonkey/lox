@@ -48,7 +48,7 @@ filter "platforms:macosxARM or linuxARM64"
 filter "system:linux"
    buildoptions { 
       "-std=c11",
-      "-D_BSD_SOURCE",
+      "-D_DEFAULT_SOURCE",
       "-D_POSIX_C_SOURCE=200112L",
       "-mcmodel=large",
       "-fPIE",

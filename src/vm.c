@@ -28,7 +28,7 @@ static value_t _usleep_native
 void           _push(value_t value);
 value_t        _pop();
 static value_t _peek(int distance);
-static bool _call(obj_function_t* function, int argCount);
+static bool    _call(obj_closure_t* closure, int argCount);
 static bool    _call_value(value_t callee, int argCount);
 static bool    _is_falsey(value_t value);
 static void    _concatenate();
@@ -46,13 +46,13 @@ static void _runtime_error(const char* format, ...) {
     fputs("\n", stderr);
 
     callframe_t* frame = &vm.frames[vm.frame_count - 1];
-    size_t instruction = frame->ip - frame->function->chunk.code - 1;
-    int line = frame->function->chunk.lines[instruction];
+    size_t instruction = frame->ip - frame->closure->function->chunk.code - 1;
+    int line = frame->closure->function->chunk.lines[instruction];
     fprintf(stderr, "[line %d] in script\n", line);
 
     for (int i = vm.frame_count - 1; i >= 0; i--) {
         callframe_t* frame = &vm.frames[i];
-        obj_function_t* function = frame->function;
+        obj_function_t* function = frame->closure->function;
         size_t instruction = frame->ip - function->chunk.code - 1;
         fprintf(stderr, "[line %d] in ", function->chunk.lines[instruction]);
         if (function->name == NULL) {
@@ -92,7 +92,7 @@ static InterpretResult _run() {
     callframe_t* frame = &vm.frames[vm.frame_count - 1];
 
 #define READ_BYTE() (*frame->ip++)
-#define READ_CONSTANT() (frame->function->chunk.constants.values[READ_BYTE()])
+#define READ_CONSTANT() (frame->closure->function->chunk.constants.values[READ_BYTE()])
 #define READ_SHORT() \
     (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
 #define READ_STRING() AS_STRING(READ_CONSTANT())
@@ -121,8 +121,8 @@ static InterpretResult _run() {
         printf("\n");
         
         l_disassemble_instruction(
-            &frame->function->chunk, 
-            (int)(frame->ip - frame->function->chunk.code)
+            &frame->closure->function->chunk, 
+            (int)(frame->ip - frame->closure->function->chunk.code)
         );
 #endif
 
@@ -133,10 +133,10 @@ static InterpretResult _run() {
                 _push(constant);
                 break;
             }
-            case OP_NIL:      _push(NIL_VAL); break;
-            case OP_TRUE:     _push(BOOL_VAL(true)); break;
-            case OP_FALSE:    _push(BOOL_VAL(false)); break;
-            case OP_POP:      _pop(); break;
+            case OP_NIL:   _push(NIL_VAL); break;
+            case OP_TRUE:  _push(BOOL_VAL(true)); break;
+            case OP_FALSE: _push(BOOL_VAL(false)); break;
+            case OP_POP:   _pop(); break;
             case OP_GET_LOCAL: {
                 uint8_t slot = READ_BYTE();
                 _push(frame->slots[slot]); 
@@ -237,6 +237,12 @@ static InterpretResult _run() {
                 frame = &vm.frames[vm.frame_count - 1];
                 break;
             }
+            case OP_CLOSURE: {
+                obj_function_t* function = AS_FUNCTION(READ_CONSTANT());
+                obj_closure_t* closure = l_new_closure(function);
+                _push(OBJ_VAL(closure));
+                break;
+            }
             case OP_RETURN: {
                 value_t result = _pop();
                 vm.frame_count--;
@@ -270,11 +276,16 @@ InterpretResult l_interpret(const char* source) {
     }
 
     _push(OBJ_VAL(function));
-    callframe_t* frame = &vm.frames[vm.frame_count++];
-    frame->function = function;
-    frame->ip = function->chunk.code;
-    frame->slots = vm.stack;
-    _call(function, 0);
+    obj_closure_t* closure = l_new_closure(function);
+    _pop();
+    _push(OBJ_VAL(closure));
+    _call(closure, 0);
+
+    // callframe_t* frame = &vm.frames[vm.frame_count++];
+    // frame->function = function;
+    // frame->ip = function->chunk.code;
+    // frame->slots = vm.stack;
+    // _call(function, 0);
 
     return _run();
 }
@@ -293,11 +304,11 @@ static value_t _peek(int distance) {
     return vm.stack_top[-1 - distance];
 }
 
-static bool _call(obj_function_t* function, int argCount) {
-    if (argCount != function->arity) {
+static bool _call(obj_closure_t* closure, int argCount) {
+    if (argCount != closure->function->arity) {
         _runtime_error(
             "Expected %d arguments but got %d.",
-            function->arity, 
+            closure->function->arity, 
             argCount
         );
         return false;
@@ -309,8 +320,8 @@ static bool _call(obj_function_t* function, int argCount) {
     }
 
     callframe_t* frame = &vm.frames[vm.frame_count++];
-    frame->function = function;
-    frame->ip = function->chunk.code;
+    frame->closure = closure;
+    frame->ip = closure->function->chunk.code;
     frame->slots = vm.stack_top - argCount - 1;
     return true;
 }
@@ -318,8 +329,8 @@ static bool _call(obj_function_t* function, int argCount) {
 static bool _call_value(value_t callee, int argCount) {
     if (IS_OBJ(callee)) {
         switch (OBJ_TYPE(callee)) {
-            case OBJ_FUNCTION: 
-                return _call(AS_FUNCTION(callee), argCount);
+            case OBJ_CLOSURE:
+                return _call(AS_CLOSURE(callee), argCount);
             case OBJ_NATIVE: {
                 native_func_t native = AS_NATIVE(callee);
                 value_t result = native(argCount, vm.stack_top - argCount);

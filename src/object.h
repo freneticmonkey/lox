@@ -6,16 +6,19 @@
 #include "value.h"
 
 #define OBJ_TYPE(value)   (AS_OBJ(value)->type)
+#define IS_CLOSURE(value)l_is_obj_type(value, OBJ_CLOSURE)
 #define IS_FUNCTION(value)l_is_obj_type(value, OBJ_FUNCTION)
 #define IS_NATIVE(value)  l_is_obj_type(value, OBJ_NATIVE)
 #define IS_STRING(value)  l_is_obj_type(value, OBJ_STRING)
 
+#define AS_CLOSURE(value) ((obj_closure_t*)AS_OBJ(value))
 #define AS_FUNCTION(value)((obj_function_t*)AS_OBJ(value))
 #define AS_NATIVE(value)  (((obj_native_t*)AS_OBJ(value))->function)
 #define AS_STRING(value)  ((obj_string_t*)AS_OBJ(value))
 #define AS_CSTRING(value) (((obj_string_t*)AS_OBJ(value))->chars)
 
 typedef enum {
+    OBJ_CLOSURE,
     OBJ_FUNCTION,
     OBJ_NATIVE,
     OBJ_STRING,
@@ -36,7 +39,7 @@ typedef struct {
 typedef value_t (*native_func_t)(int argCount, value_t *args);
 
 typedef struct {
-    obj_t obj;
+    obj_t         obj;
     native_func_t function;
 } obj_native_t;
 
@@ -47,6 +50,14 @@ struct obj_string_t {
     uint32_t hash;
 };
 
+typedef struct
+{
+    obj_t           obj;
+    obj_function_t* function;
+
+} obj_closure_t;
+
+obj_closure_t*  l_new_closure(obj_function_t* function);
 obj_function_t* l_new_function();
 obj_native_t*   l_new_native(native_func_t function);
 obj_string_t*   l_take_string(char* chars, int length);
