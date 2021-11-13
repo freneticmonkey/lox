@@ -42,7 +42,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/lox",
-            "args": ["src/test/scripts/funcs.lox"],
+            "args": ["src/test/scripts/closure.lox"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

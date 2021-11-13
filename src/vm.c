@@ -30,12 +30,15 @@ value_t        _pop();
 static value_t _peek(int distance);
 static bool    _call(obj_closure_t* closure, int argCount);
 static bool    _call_value(value_t callee, int argCount);
+static obj_upvalue_t* _capture_upvalue(value_t* local);
+static void     _close_upvalues(value_t* last);
 static bool    _is_falsey(value_t value);
 static void    _concatenate();
 
 static void _reset_stack() {
     vm.stack_top = vm.stack;
     vm.frame_count = 0;
+    vm.open_upvalues = NULL;
 }
 
 static void _runtime_error(const char* format, ...) {
@@ -172,6 +175,16 @@ static InterpretResult _run() {
                 }
                 break;
             }
+            case OP_GET_UPVALUE: {
+                uint8_t slot = READ_BYTE();
+                _push(*frame->closure->upvalues[slot]->location);
+                break;
+            }
+            case OP_SET_UPVALUE: {
+                uint8_t slot = READ_BYTE();
+                *frame->closure->upvalues[slot]->location = _peek(0);
+                break;
+            }
             case OP_EQUAL: {
                 value_t b = _pop();
                 value_t a = _pop();
@@ -239,12 +252,27 @@ static InterpretResult _run() {
             }
             case OP_CLOSURE: {
                 obj_function_t* function = AS_FUNCTION(READ_CONSTANT());
-                obj_closure_t* closure = l_new_closure(function);
+                obj_closure_t*  closure = l_new_closure(function);
                 _push(OBJ_VAL(closure));
+
+                for (int i = 0; i < closure->upvalue_count; i++) {
+                    uint8_t isLocal = READ_BYTE();
+                    uint8_t index = READ_BYTE();
+                    if (isLocal) {
+                        closure->upvalues[i] = _capture_upvalue(frame->slots + index);
+                    } else {
+                        closure->upvalues[i] = frame->closure->upvalues[index];
+                    }
+                }
                 break;
             }
+            case OP_CLOSE_UPVALUE:
+                _close_upvalues(vm.stack_top - 1);
+                _pop();
+                break;
             case OP_RETURN: {
                 value_t result = _pop();
+                _close_upvalues(frame->slots);
                 vm.frame_count--;
                 if (vm.frame_count == 0) {
                     _pop();
@@ -344,6 +372,41 @@ static bool _call_value(value_t callee, int argCount) {
     }
     _runtime_error("Can only call functions and classes.");
     return false;
+}
+
+static obj_upvalue_t* _capture_upvalue(value_t* local) {
+    obj_upvalue_t* prevUpvalue = NULL;
+    obj_upvalue_t* upvalue = vm.open_upvalues;
+    while (upvalue != NULL && upvalue->location > local) {
+        prevUpvalue = upvalue;
+        upvalue = upvalue->next;
+    }
+
+    if (upvalue != NULL && upvalue->location == local) {
+        return upvalue;
+    }
+    
+    obj_upvalue_t* createdUpvalue = l_new_upvalue(local);
+
+    createdUpvalue->next = upvalue;
+
+    if (prevUpvalue == NULL) {
+        vm.open_upvalues = createdUpvalue;
+    } else {
+        prevUpvalue->next = createdUpvalue;
+    }
+
+    return createdUpvalue;
+}
+
+static void _close_upvalues(value_t* last) {
+  while (vm.open_upvalues != NULL &&
+         vm.open_upvalues->location >= last) {
+    obj_upvalue_t* upvalue = vm.open_upvalues;
+    upvalue->closed = *upvalue->location;
+    upvalue->location = &upvalue->closed;
+    vm.open_upvalues = upvalue->next;
+  }
 }
 
 static bool _is_falsey(value_t value) {

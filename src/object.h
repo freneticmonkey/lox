@@ -22,6 +22,7 @@ typedef enum {
     OBJ_FUNCTION,
     OBJ_NATIVE,
     OBJ_STRING,
+    OBJ_UPVALUE,
 } ObjType;
 
 struct obj_t{
@@ -32,6 +33,7 @@ struct obj_t{
 typedef struct {
     obj_t obj;
     int   arity;
+    int   upvalue_count;
     chunk_t chunk;
     obj_string_t* name;
 } obj_function_t;
@@ -50,10 +52,19 @@ struct obj_string_t {
     uint32_t hash;
 };
 
-typedef struct
-{
+typedef struct obj_upvalue_t obj_upvalue_t;
+typedef struct obj_upvalue_t {
+    obj_t          obj;
+    value_t*       location;
+    value_t        closed;
+    obj_upvalue_t* next;
+} obj_upvalue_t;
+
+typedef struct {
     obj_t           obj;
     obj_function_t* function;
+    obj_upvalue_t** upvalues;
+    int             upvalue_count;
 
 } obj_closure_t;
 
@@ -62,6 +73,7 @@ obj_function_t* l_new_function();
 obj_native_t*   l_new_native(native_func_t function);
 obj_string_t*   l_take_string(char* chars, int length);
 obj_string_t*   l_copy_string(const char* chars, int length);
+obj_upvalue_t*  l_new_upvalue(value_t* slot);
 
 void l_print_object(value_t value);
 
