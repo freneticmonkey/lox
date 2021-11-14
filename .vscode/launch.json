@@ -64,7 +64,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/test",
-            "args": [],
+            "args": ["--no-fork"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

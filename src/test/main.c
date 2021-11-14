@@ -2,12 +2,14 @@
 
 #include "common.h"
 #include "test/bytecode_test.h"
+#include "test/scripts_test.h"
 
 int main(int argc, const char* argv[]) {
     printf("Starting lox unit tests...\n");
 
     MunitSuite suites[] = {
         l_bytecode_test_setup(),
+        l_scripts_test_setup(),
     };
 
     /* Now we'll actually declare the test suite.  You could do this in
