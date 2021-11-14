@@ -1,4 +1,5 @@
 #include "chunk.h"
+#include "vm.h"
 #include "lib/debug.h"
 
 #include "test/bytecode_test.h"
@@ -17,6 +18,8 @@ static MunitResult _chunk_compare(const MunitParameter params[], void *user_data
 	(void)user_data;
 	// munit_log(MUNIT_LOG_WARNING , "test NYI");
 
+    l_init_vm();
+
     chunk_t chunk;
     l_init_chunk(&chunk);
 
@@ -34,6 +37,8 @@ static MunitResult _chunk_compare(const MunitParameter params[], void *user_data
     munit_assert_int(chunk.code[2], == , OP_RETURN);
 
     l_free_chunk(&chunk);
+
+    l_free_vm();
 
 	return MUNIT_OK;
 }
