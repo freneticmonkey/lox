@@ -2,6 +2,7 @@
 #define LIB_MEMORY_H
 
 #include "common.h"
+#include "compiler.h"
 #include "object.h"
 
 #define ALLOCATE(type, count) \
@@ -20,7 +21,10 @@
     reallocate(pointer, sizeof(type) * (oldCount), 0)
 
 void* reallocate(void* pointer, size_t oldSize, size_t newSize);
+void  l_collect_garbage();
 
+void l_mark_object(obj_t* object);
+void l_mark_value(value_t value);
 void l_free_objects();
 
 #endif

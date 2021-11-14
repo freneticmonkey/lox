@@ -6,6 +6,7 @@
 
 #include "common.h"
 #include "scanner.h"
+#include "lib/memory.h"
 
 #ifdef DEBUG_PRINT_CODE
 #include "lib/debug.h"
@@ -845,4 +846,12 @@ obj_function_t* l_compile(const char* source) {
     obj_function_t* function = _end_compiler();
 
     return _parser.had_error ? NULL : function;    
+}
+
+void l_mark_compiler_roots() {
+    compiler_t* compiler = _current;
+    while (compiler != NULL) {
+        l_mark_object((obj_t*)compiler->function);
+        compiler = compiler->enclosing;
+    }
 }

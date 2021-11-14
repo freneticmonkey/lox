@@ -26,8 +26,8 @@ static void _repl() {
 
 int main(int argc, const char* argv[]) {
     printf("Starting lox %s ...\ncommit: %s\nbranch: %s\n", 
-        VERSION, 
-        COMMIT, 
+        VERSION,
+        COMMIT,
         BRANCH
     );
 

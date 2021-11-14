@@ -1,6 +1,7 @@
 #include <stdlib.h>
 
 #include "chunk.h"
+#include "vm.h"
 #include "lib/memory.h"
 
 void l_init_chunk(chunk_t* chunk) {
@@ -33,7 +34,9 @@ void l_write_chunk(chunk_t* chunk, uint8_t byte, int line)
 }
 
 int l_add_constant(chunk_t* chunk, value_t value) {
+    l_push(value);
     l_write_value_array(&chunk->constants, value);
+    l_pop();
     // return the index of the new constant
     return chunk->constants.count - 1;
 }

@@ -25,8 +25,6 @@ static value_t _usleep_native
     return NUMBER_VAL(-1);
 }
 
-void           _push(value_t value);
-value_t        _pop();
 static value_t _peek(int distance);
 static bool    _call(obj_closure_t* closure, int argCount);
 static bool    _call_value(value_t callee, int argCount);
@@ -68,11 +66,11 @@ static void _runtime_error(const char* format, ...) {
 }
 
 static void _define_native(const char* name, native_func_t function) {
-    _push(OBJ_VAL(l_copy_string(name, (int)strlen(name))));
-    _push(OBJ_VAL(l_new_native(function)));
+    l_push(OBJ_VAL(l_copy_string(name, (int)strlen(name))));
+    l_push(OBJ_VAL(l_new_native(function)));
     l_table_set(&vm.globals, AS_STRING(vm.stack[0]), vm.stack[1]);
-    _pop();
-    _pop();
+    l_pop();
+    l_pop();
 }
 
 void l_init_vm() {
@@ -81,6 +79,14 @@ void l_init_vm() {
     l_init_table(&vm.globals);
     l_init_table(&vm.strings);
 
+    // garbage collection
+    vm.bytes_allocated = 0;
+    vm.next_gc = 1024 * 1024;
+    vm.gray_count = 0;
+    vm.gray_capacity = 0;
+    vm.gray_stack = NULL;
+
+    // native functions
     _define_native("clock", _clock_native);
     _define_native("usleep", _usleep_native);
 }
@@ -105,9 +111,9 @@ static InterpretResult _run() {
             _runtime_error("Operands must be numbers."); \
             return INTERPRET_RUNTIME_ERROR; \
         } \
-        double b = AS_NUMBER(_pop()); \
-        double a = AS_NUMBER(_pop()); \
-        _push(valueType(a op b)); \
+        double b = AS_NUMBER(l_pop()); \
+        double a = AS_NUMBER(l_pop()); \
+        l_push(valueType(a op b)); \
     } while (false)
 
 
@@ -133,16 +139,16 @@ static InterpretResult _run() {
         switch (instruction = READ_BYTE()) {
             case OP_CONSTANT: {
                 value_t constant = READ_CONSTANT();
-                _push(constant);
+                l_push(constant);
                 break;
             }
-            case OP_NIL:   _push(NIL_VAL); break;
-            case OP_TRUE:  _push(BOOL_VAL(true)); break;
-            case OP_FALSE: _push(BOOL_VAL(false)); break;
-            case OP_POP:   _pop(); break;
+            case OP_NIL:   l_push(NIL_VAL); break;
+            case OP_TRUE:  l_push(BOOL_VAL(true)); break;
+            case OP_FALSE: l_push(BOOL_VAL(false)); break;
+            case OP_POP:   l_pop(); break;
             case OP_GET_LOCAL: {
                 uint8_t slot = READ_BYTE();
-                _push(frame->slots[slot]); 
+                l_push(frame->slots[slot]); 
                 break;
             }
             case OP_SET_LOCAL: {
@@ -157,13 +163,13 @@ static InterpretResult _run() {
                     _runtime_error("Undefined variable '%s'.", name->chars);
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                _push(value);
+                l_push(value);
                 break;
             }
             case OP_DEFINE_GLOBAL: {
                 obj_string_t* name = READ_STRING();
                 l_table_set(&vm.globals, name, _peek(0));
-                _pop();
+                l_pop();
                 break;
             }
             case OP_SET_GLOBAL: {
@@ -177,7 +183,7 @@ static InterpretResult _run() {
             }
             case OP_GET_UPVALUE: {
                 uint8_t slot = READ_BYTE();
-                _push(*frame->closure->upvalues[slot]->location);
+                l_push(*frame->closure->upvalues[slot]->location);
                 break;
             }
             case OP_SET_UPVALUE: {
@@ -186,9 +192,9 @@ static InterpretResult _run() {
                 break;
             }
             case OP_EQUAL: {
-                value_t b = _pop();
-                value_t a = _pop();
-                _push(BOOL_VAL(l_values_equal(a, b)));
+                value_t b = l_pop();
+                value_t a = l_pop();
+                l_push(BOOL_VAL(l_values_equal(a, b)));
                 break;
             }
             case OP_GREATER:  BINARY_OP(BOOL_VAL, >); break;
@@ -198,9 +204,9 @@ static InterpretResult _run() {
                     _concatenate();
                 } 
                 else if (IS_NUMBER(_peek(0)) && IS_NUMBER(_peek(1))) {
-                    double b = AS_NUMBER(_pop());
-                    double a = AS_NUMBER(_pop());
-                    _push(NUMBER_VAL(a + b));
+                    double b = AS_NUMBER(l_pop());
+                    double a = AS_NUMBER(l_pop());
+                    l_push(NUMBER_VAL(a + b));
                 } 
                 else {
                     _runtime_error(
@@ -212,17 +218,17 @@ static InterpretResult _run() {
             case OP_SUBTRACT: BINARY_OP(NUMBER_VAL, -); break;
             case OP_MULTIPLY: BINARY_OP(NUMBER_VAL, *); break;
             case OP_DIVIDE:   BINARY_OP(NUMBER_VAL, /); break;
-            case OP_NOT:      _push(BOOL_VAL(_is_falsey(_pop()))); break;
+            case OP_NOT:      l_push(BOOL_VAL(_is_falsey(l_pop()))); break;
             case OP_NEGATE: {
                 if (!IS_NUMBER(_peek(0))) {
                     _runtime_error("Operand must be a number.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
-                _push(NUMBER_VAL(-AS_NUMBER(_pop())));
+                l_push(NUMBER_VAL(-AS_NUMBER(l_pop())));
                 break;
             }
             case OP_PRINT: {
-                l_print_value(_pop());
+                l_print_value(l_pop());
                 printf("\n");
                 break;
             }
@@ -253,7 +259,7 @@ static InterpretResult _run() {
             case OP_CLOSURE: {
                 obj_function_t* function = AS_FUNCTION(READ_CONSTANT());
                 obj_closure_t*  closure = l_new_closure(function);
-                _push(OBJ_VAL(closure));
+                l_push(OBJ_VAL(closure));
 
                 for (int i = 0; i < closure->upvalue_count; i++) {
                     uint8_t isLocal = READ_BYTE();
@@ -268,19 +274,19 @@ static InterpretResult _run() {
             }
             case OP_CLOSE_UPVALUE:
                 _close_upvalues(vm.stack_top - 1);
-                _pop();
+                l_pop();
                 break;
             case OP_RETURN: {
-                value_t result = _pop();
+                value_t result = l_pop();
                 _close_upvalues(frame->slots);
                 vm.frame_count--;
                 if (vm.frame_count == 0) {
-                    _pop();
+                    l_pop();
                     return INTERPRET_OK;
                 }
 
                 vm.stack_top = frame->slots;
-                _push(result);
+                l_push(result);
                 frame = &vm.frames[vm.frame_count - 1];
                 break;
             }
@@ -303,10 +309,10 @@ InterpretResult l_interpret(const char* source) {
         return INTERPRET_COMPILE_ERROR;
     }
 
-    _push(OBJ_VAL(function));
+    l_push(OBJ_VAL(function));
     obj_closure_t* closure = l_new_closure(function);
-    _pop();
-    _push(OBJ_VAL(closure));
+    l_pop();
+    l_push(OBJ_VAL(closure));
     _call(closure, 0);
 
     // callframe_t* frame = &vm.frames[vm.frame_count++];
@@ -318,12 +324,12 @@ InterpretResult l_interpret(const char* source) {
     return _run();
 }
 
-void _push(value_t value) {
+void l_push(value_t value) {
     *vm.stack_top = value;
     vm.stack_top++;
 }
 
-value_t _pop() {
+value_t l_pop() {
     vm.stack_top--;
     return *vm.stack_top;
 }
@@ -363,7 +369,7 @@ static bool _call_value(value_t callee, int argCount) {
                 native_func_t native = AS_NATIVE(callee);
                 value_t result = native(argCount, vm.stack_top - argCount);
                 vm.stack_top -= argCount + 1;
-                _push(result);
+                l_push(result);
                 return true;
             }
             default:
@@ -414,8 +420,8 @@ static bool _is_falsey(value_t value) {
 }
 
 static void _concatenate() {
-    obj_string_t* b = AS_STRING(_pop());
-    obj_string_t* a = AS_STRING(_pop());
+    obj_string_t* b = AS_STRING(_peek(0));
+    obj_string_t* a = AS_STRING(_peek(1));
 
     int length = a->length + b->length;
     char* chars = ALLOCATE(char, length + 1);
@@ -424,5 +430,9 @@ static void _concatenate() {
     chars[length] = '\0';
 
     obj_string_t* result = l_take_string(chars, length);
-    _push(OBJ_VAL(result));
+
+    l_pop();
+    l_pop();
+    
+    l_push(OBJ_VAL(result));
 }

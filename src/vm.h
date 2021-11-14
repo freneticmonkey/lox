@@ -24,6 +24,14 @@ typedef struct {
     table_t  strings;
     obj_t*   objects;
     obj_upvalue_t* open_upvalues;
+
+    // garbage collection
+    size_t bytes_allocated;
+    size_t next_gc;
+    int gray_count;
+    int gray_capacity;
+    obj_t** gray_stack;
+
 } vm_t;
 
 typedef enum {
@@ -37,6 +45,9 @@ extern vm_t vm;
 
 void l_init_vm();
 void l_free_vm();
+
+void    l_push(value_t value);
+value_t l_pop();
 
 InterpretResult l_interpret(const char * source);
 

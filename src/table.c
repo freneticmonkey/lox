@@ -147,3 +147,21 @@ obj_string_t* l_table_find_string(table_t* table, const char* chars, int length,
         index = (index + 1) % table->capacity;
     }
 }
+
+void l_mark_table(table_t* table) {
+    for (int i = 0; i < table->capacity; i++) {
+        entry_t* entry = &table->entries[i];
+        l_mark_object((obj_t*)entry->key);
+        l_mark_value(entry->value);
+    }
+}
+
+void l_table_remove_white(table_t* table) {
+    for (int i = 0; i < table->capacity; i++) {
+        entry_t* entry = &table->entries[i];
+        
+        if (entry->key != NULL && !entry->key->obj.is_marked) {
+            l_table_delete(table, entry->key);
+        }
+    }
+}

@@ -8,4 +8,5 @@
 
 obj_function_t* l_compile(const char* source);
 
+void l_mark_compiler_roots();
 #endif
