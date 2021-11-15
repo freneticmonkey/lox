@@ -16,9 +16,7 @@ static value_t _clock_native(int argCount, value_t* args) {
     return NUMBER_VAL((double)clock() / CLOCKS_PER_SEC);
 }
 
-static value_t _usleep_native
-(int argCount, value_t* args) {
-
+static value_t _usleep_native(int argCount, value_t* args) {
     if ( argCount == 1 && IS_NUMBER(args[0]) ) {
         return NUMBER_VAL(usleep((unsigned int)AS_NUMBER(args[0])));
     }
@@ -28,6 +26,7 @@ static value_t _usleep_native
 static value_t _peek(int distance);
 static bool    _call(obj_closure_t* closure, int argCount);
 static bool    _call_value(value_t callee, int argCount);
+static bool    _invoke(obj_string_t* name, int argCount);
 static bool    _bind_method(obj_class_t* klass, obj_string_t* name);
 
 static obj_upvalue_t* _capture_upvalue(value_t* local);
@@ -79,7 +78,7 @@ static void _define_native(const char* name, native_func_t function) {
 void l_init_vm() {
     _reset_stack();
     vm.objects = NULL;
-    
+
     // garbage collection
     vm.bytes_allocated = 0;
     vm.next_gc = 1024 * 1024;
@@ -299,6 +298,15 @@ static InterpretResult _run() {
                 frame = &vm.frames[vm.frame_count - 1];
                 break;
             }
+            case OP_INVOKE: {
+                obj_string_t* method = READ_STRING();
+                int argCount = READ_BYTE();
+                if (!_invoke(method, argCount)) {
+                   return INTERPRET_RUNTIME_ERROR;
+                }
+                frame = &vm.frames[vm.frame_count - 1];
+                break;
+            }
             case OP_CLOSURE: {
                 obj_function_t* function = AS_FUNCTION(READ_CONSTANT());
                 obj_closure_t*  closure = l_new_closure(function);
@@ -442,6 +450,34 @@ static bool _call_value(value_t callee, int argCount) {
     }
     _runtime_error("Can only call functions and classes.");
     return false;
+}
+
+static bool _invoke_from_class(obj_class_t* klass, obj_string_t* name, int argCount) {
+    value_t method;
+    if (!l_table_get(&klass->methods, name, &method)) {
+        _runtime_error("Undefined property '%s'.", name->chars);
+        return false;
+    }
+    return _call(AS_CLOSURE(method), argCount);
+}
+
+static bool _invoke(obj_string_t* name, int argCount) {
+    value_t receiver = _peek(argCount);
+
+    if (!IS_INSTANCE(receiver)) {
+        _runtime_error("Only instances have methods.");
+        return false;
+    }
+
+    obj_instance_t* instance = AS_INSTANCE(receiver);
+
+    value_t value;
+    if (l_table_get(&instance->fields, name, &value)) {
+        vm.stack_top[-argCount - 1] = value;
+        return _call_value(value, argCount);
+    }
+
+    return _invoke_from_class(instance->klass, name, argCount);
 }
 
 static bool _bind_method(obj_class_t* klass, obj_string_t* name) {

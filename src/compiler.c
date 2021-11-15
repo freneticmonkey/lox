@@ -456,6 +456,10 @@ static void _dot(bool canAssign) {
     if (canAssign && _match(TOKEN_EQUAL)) {
         _expression();
         _emit_bytes(OP_SET_PROPERTY, name);
+    } else if ( _match(TOKEN_LEFT_PAREN) ) {
+        uint8_t argCount = _argument_list();
+        _emit_bytes(OP_INVOKE, name);
+        _emit_byte(argCount);
     } else {
         _emit_bytes(OP_GET_PROPERTY, name);
     }
