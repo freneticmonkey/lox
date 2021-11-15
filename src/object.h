@@ -7,22 +7,26 @@
 #include "value.h"
 
 #define OBJ_TYPE(value)   (AS_OBJ(value)->type)
-#define IS_CLASS(value)   l_is_obj_type(value, OBJ_CLASS)
-#define IS_CLOSURE(value) l_is_obj_type(value, OBJ_CLOSURE)
-#define IS_FUNCTION(value)l_is_obj_type(value, OBJ_FUNCTION)
-#define IS_INSTANCE(value)l_is_obj_type(value, OBJ_INSTANCE)
-#define IS_NATIVE(value)  l_is_obj_type(value, OBJ_NATIVE)
-#define IS_STRING(value)  l_is_obj_type(value, OBJ_STRING)
 
-#define AS_CLASS(value)   ((obj_class_t*)AS_OBJ(value))
-#define AS_CLOSURE(value) ((obj_closure_t*)AS_OBJ(value))
-#define AS_FUNCTION(value)((obj_function_t*)AS_OBJ(value))
-#define AS_INSTANCE(value)((obj_instance_t*)AS_OBJ(value))
-#define AS_NATIVE(value)  (((obj_native_t*)AS_OBJ(value))->function)
-#define AS_STRING(value)  ((obj_string_t*)AS_OBJ(value))
-#define AS_CSTRING(value) (((obj_string_t*)AS_OBJ(value))->chars)
+#define IS_BOUND_METHOD(value) l_is_obj_type(value, OBJ_BOUND_METHOD)
+#define IS_CLASS(value)        l_is_obj_type(value, OBJ_CLASS)
+#define IS_CLOSURE(value)      l_is_obj_type(value, OBJ_CLOSURE)
+#define IS_FUNCTION(value)     l_is_obj_type(value, OBJ_FUNCTION)
+#define IS_INSTANCE(value)     l_is_obj_type(value, OBJ_INSTANCE)
+#define IS_NATIVE(value)       l_is_obj_type(value, OBJ_NATIVE)
+#define IS_STRING(value)       l_is_obj_type(value, OBJ_STRING)
+
+#define AS_BOUND_METHOD(value) ((obj_bound_method_t*)AS_OBJ(value))
+#define AS_CLASS(value)        ((obj_class_t*)AS_OBJ(value))
+#define AS_CLOSURE(value)      ((obj_closure_t*)AS_OBJ(value))
+#define AS_FUNCTION(value)     ((obj_function_t*)AS_OBJ(value))
+#define AS_INSTANCE(value)     ((obj_instance_t*)AS_OBJ(value))
+#define AS_NATIVE(value)       (((obj_native_t*)AS_OBJ(value))->function)
+#define AS_STRING(value)       ((obj_string_t*)AS_OBJ(value))
+#define AS_CSTRING(value)      (((obj_string_t*)AS_OBJ(value))->chars)
 
 typedef enum {
+    OBJ_BOUND_METHOD,
     OBJ_CLASS,
     OBJ_CLOSURE,
     OBJ_FUNCTION,
@@ -31,6 +35,17 @@ typedef enum {
     OBJ_STRING,
     OBJ_UPVALUE,
 } ObjType;
+
+static char* obj_type_to_string[] = {
+    "Bound Method",
+    "Class",
+    "Closure",
+    "Function",
+    "Instance",
+    "Native function",
+    "String",
+    "Upvalue",
+};
 
 struct obj_t{
     ObjType       type;
@@ -79,6 +94,7 @@ typedef struct {
 typedef struct {
     obj_t         obj;
     obj_string_t* name;
+    table_t       methods;
 } obj_class_t;
 
 typedef struct {
@@ -87,14 +103,21 @@ typedef struct {
     table_t      fields;
 } obj_instance_t;
 
-obj_class_t*    l_new_class(obj_string_t* name);
-obj_closure_t*  l_new_closure(obj_function_t* function);
-obj_function_t* l_new_function();
-obj_instance_t* l_new_instance(obj_class_t* klass);
-obj_native_t*   l_new_native(native_func_t function);
-obj_string_t*   l_take_string(char* chars, int length);
-obj_string_t*   l_copy_string(const char* chars, int length);
-obj_upvalue_t*  l_new_upvalue(value_t* slot);
+typedef struct {
+    obj_t obj;
+    value_t receiver;
+    obj_closure_t* method;
+} obj_bound_method_t;
+
+obj_bound_method_t* l_new_bound_method(value_t receiver, obj_closure_t* method);
+obj_class_t*        l_new_class(obj_string_t* name);
+obj_closure_t*      l_new_closure(obj_function_t* function);
+obj_function_t*     l_new_function();
+obj_instance_t*     l_new_instance(obj_class_t* klass);
+obj_native_t*       l_new_native(native_func_t function);
+obj_string_t*       l_take_string(char* chars, int length);
+obj_string_t*       l_copy_string(const char* chars, int length);
+obj_upvalue_t*      l_new_upvalue(value_t* slot);
 
 void l_print_object(value_t value);
 

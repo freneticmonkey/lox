@@ -28,8 +28,11 @@ static value_t _usleep_native
 static value_t _peek(int distance);
 static bool    _call(obj_closure_t* closure, int argCount);
 static bool    _call_value(value_t callee, int argCount);
+static bool    _bind_method(obj_class_t* klass, obj_string_t* name);
+
 static obj_upvalue_t* _capture_upvalue(value_t* local);
-static void     _close_upvalues(value_t* last);
+static void    _close_upvalues(value_t* last);
+static void    _define_method(obj_string_t* name);
 static bool    _is_falsey(value_t value);
 static void    _concatenate();
 
@@ -76,15 +79,20 @@ static void _define_native(const char* name, native_func_t function) {
 void l_init_vm() {
     _reset_stack();
     vm.objects = NULL;
-    l_init_table(&vm.globals);
-    l_init_table(&vm.strings);
-
+    
     // garbage collection
     vm.bytes_allocated = 0;
     vm.next_gc = 1024 * 1024;
     vm.gray_count = 0;
     vm.gray_capacity = 0;
     vm.gray_stack = NULL;
+
+    l_init_table(&vm.globals);
+    l_init_table(&vm.strings);
+
+    vm.init_string = NULL;
+    vm.init_string = l_copy_string("init", 4);
+
 
     // native functions
     _define_native("clock", _clock_native);
@@ -94,6 +102,7 @@ void l_init_vm() {
 void l_free_vm() {
     l_free_table(&vm.strings);
     l_free_table(&vm.globals);
+    vm.init_string = NULL;
     l_free_objects();
 }
 
@@ -207,8 +216,10 @@ static InterpretResult _run() {
                     break;
                 }
 
-                _runtime_error("Undefined property '%s'.", name->chars);
-                return INTERPRET_RUNTIME_ERROR;
+                if (!_bind_method(instance->klass, name)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                break;
             }
             case OP_SET_PROPERTY: {
                 if (!IS_INSTANCE(_peek(1))) {
@@ -324,6 +335,10 @@ static InterpretResult _run() {
             }
             case OP_CLASS:
                 l_push(OBJ_VAL(l_new_class(READ_STRING())));
+                break;
+            case OP_METHOD:
+                _define_method(READ_STRING());
+                break;
             break;
         }
     }
@@ -349,12 +364,6 @@ InterpretResult l_interpret(const char* source) {
     l_pop();
     l_push(OBJ_VAL(closure));
     _call(closure, 0);
-
-    // callframe_t* frame = &vm.frames[vm.frame_count++];
-    // frame->function = function;
-    // frame->ip = function->chunk.code;
-    // frame->slots = vm.stack;
-    // _call(function, 0);
 
     return _run();
 }
@@ -398,9 +407,24 @@ static bool _call(obj_closure_t* closure, int argCount) {
 static bool _call_value(value_t callee, int argCount) {
     if (IS_OBJ(callee)) {
         switch (OBJ_TYPE(callee)) {
+            case OBJ_BOUND_METHOD: {
+                obj_bound_method_t* bound = AS_BOUND_METHOD(callee);
+                vm.stack_top[-argCount - 1] = bound->receiver;
+                return _call(bound->method, argCount);
+            }
             case OBJ_CLASS: {
                 obj_class_t* klass = AS_CLASS(callee);
                 vm.stack_top[-argCount - 1] = OBJ_VAL(l_new_instance(klass));
+
+                // call init on the new class instance
+                value_t initializer;
+                if (l_table_get(&klass->methods, vm.init_string, &initializer)) {
+                    return _call(AS_CLOSURE(initializer), argCount);
+                } else if (argCount != 0) {
+                    _runtime_error("Expected 0 arguments but got %d.", argCount);
+                    return false;
+                }
+
                 return true;
             }
             case OBJ_CLOSURE:
@@ -418,6 +442,19 @@ static bool _call_value(value_t callee, int argCount) {
     }
     _runtime_error("Can only call functions and classes.");
     return false;
+}
+
+static bool _bind_method(obj_class_t* klass, obj_string_t* name) {
+    value_t method;
+    if (!l_table_get(&klass->methods, name, &method)) {
+        _runtime_error("Undefined property '%s'.", name->chars);
+        return false;
+    }
+
+    obj_bound_method_t* bound = l_new_bound_method(_peek(0), AS_CLOSURE(method));
+    l_pop();
+    l_push(OBJ_VAL(bound));
+    return true;
 }
 
 static obj_upvalue_t* _capture_upvalue(value_t* local) {
@@ -446,13 +483,21 @@ static obj_upvalue_t* _capture_upvalue(value_t* local) {
 }
 
 static void _close_upvalues(value_t* last) {
-  while (vm.open_upvalues != NULL &&
-         vm.open_upvalues->location >= last) {
-    obj_upvalue_t* upvalue = vm.open_upvalues;
-    upvalue->closed = *upvalue->location;
-    upvalue->location = &upvalue->closed;
-    vm.open_upvalues = upvalue->next;
-  }
+    while (vm.open_upvalues != NULL &&
+           vm.open_upvalues->location >= last) {
+
+        obj_upvalue_t* upvalue = vm.open_upvalues;
+        upvalue->closed = *upvalue->location;
+        upvalue->location = &upvalue->closed;
+        vm.open_upvalues = upvalue->next;
+    }
+}
+
+static void _define_method(obj_string_t* name) {
+    value_t method = _peek(0);
+    obj_class_t* klass = AS_CLASS(_peek(1));
+    l_table_set(&klass->methods, name, method);
+    l_pop();
 }
 
 static bool _is_falsey(value_t value) {

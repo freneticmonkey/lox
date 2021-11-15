@@ -24,12 +24,13 @@ typedef struct {
     table_t  strings;
     obj_t*   objects;
     obj_upvalue_t* open_upvalues;
+    obj_string_t*  init_string;
 
     // garbage collection
     size_t bytes_allocated;
     size_t next_gc;
-    int gray_count;
-    int gray_capacity;
+    int    gray_count;
+    int    gray_capacity;
     obj_t** gray_stack;
 
 } vm_t;

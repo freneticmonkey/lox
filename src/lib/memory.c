@@ -10,10 +10,40 @@
 
 #define GC_HEAP_GROW_FACTOR 2
 
+static size_t _internal_alloc = 0;
+static size_t _internal_dealloc = 0;
+static size_t _internal_vm_alloc_max = 0;
+
 void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
 
-    vm.bytes_allocated += newSize - oldSize;
+    // deallocating
+    size_t alloc_size = newSize - oldSize;
+    size_t vm_bytes = vm.bytes_allocated;
 
+    if ( (newSize < oldSize) && ( (SIZE_MAX - alloc_size + 1) > vm.bytes_allocated ) ) {
+        printf("detected untracked vm memory. vm bytes: %zu. dealloc bytes: %zu\n", 
+                vm.bytes_allocated, 
+                (SIZE_MAX - alloc_size + 1)
+        );
+        printf("internal tracking. alloc bytes: %zu. dealloc bytes: %zu vm max alloc: %zu\n", 
+                _internal_alloc, 
+                _internal_dealloc,
+                _internal_vm_alloc_max
+        );
+        exit(1);
+    }
+
+    if (newSize > oldSize) {
+        _internal_alloc += alloc_size;
+    } else {
+        _internal_dealloc += (SIZE_MAX - alloc_size + 1);
+    }   
+
+    if ( vm.bytes_allocated > _internal_vm_alloc_max ) {
+        _internal_vm_alloc_max = vm.bytes_allocated;
+    }
+
+    vm.bytes_allocated += alloc_size;
     if (newSize > oldSize) {
 #ifdef DEBUG_STRESS_GC
         l_collect_garbage();
@@ -25,13 +55,43 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
     }
 
     if (newSize == 0) {
+
+#ifdef DEBUG_LOG_GC
+    if (pointer == NULL) {
+        printf("[free] <(nil)            vm bytes: %zu->%zu.\t dealloc bytes:-%zu\n",
+                vm_bytes,
+                vm.bytes_allocated,
+                (SIZE_MAX - alloc_size + 1)
+        );
+
+    } else {
+        printf("[free] <%p\t vm bytes: %zu->%zu.\t dealloc bytes:-%zu\n",
+                pointer,
+                vm_bytes,
+                vm.bytes_allocated,
+                (SIZE_MAX - alloc_size + 1)
+        );
+    }
+    
+#endif
         free(pointer);
         return NULL;
     }
 
     void* result = realloc(pointer, newSize);
-    if (result == NULL) 
+
+    if (result == NULL)
         exit(1);
+
+#ifdef DEBUG_LOG_GC
+    printf("[new]  >%p\t vm bytes: %zu->%zu.\t alloc bytes: %zu\n",
+            result,
+            vm_bytes,
+            vm.bytes_allocated, 
+            alloc_size
+    );
+#endif
+
     return result;
 }
 
@@ -81,9 +141,16 @@ static void _blacken_object(obj_t* object) {
 #endif
 
     switch (object->type) {
+        case OBJ_BOUND_METHOD: {
+            obj_bound_method_t* bound = (obj_bound_method_t*)object;
+            l_mark_value(bound->receiver);
+            l_mark_object((obj_t*)bound->method);
+            break;
+        }
         case OBJ_CLASS: {
             obj_class_t* klass = (obj_class_t*)object;
             l_mark_object((obj_t*)klass->name);
+            l_mark_table(&klass->methods);
             break;
         }
         case OBJ_CLOSURE: {
@@ -116,12 +183,58 @@ static void _blacken_object(obj_t* object) {
 }
 
 static void _free_object(obj_t* object) {
+
 #ifdef DEBUG_LOG_GC
-    printf("%p free type %d\n", (void*)object, object->type);
+
+    size_t free_size = 0;
+
+    switch (object->type) {
+        case OBJ_BOUND_METHOD:
+            free_size = sizeof(obj_bound_method_t);
+            break;
+        case OBJ_CLASS: {
+            free_size = sizeof(obj_class_t);
+            break;
+        } 
+        case OBJ_CLOSURE: {
+            free_size = sizeof(obj_closure_t);
+            break;
+        }
+        case OBJ_FUNCTION: {
+            free_size = sizeof(obj_function_t);
+            break;
+        }
+        case OBJ_INSTANCE: {
+            free_size = sizeof(obj_instance_t);
+            break;
+        }
+        case OBJ_NATIVE: {
+            free_size = sizeof(obj_native_t);
+            break;
+        }
+        case OBJ_STRING: {
+            free_size = sizeof(obj_string_t);
+            break;
+        }
+        case OBJ_UPVALUE:
+            free_size = sizeof(obj_upvalue_t);
+            break;
+    }
+
+    printf("%p free %zu type %s\n",
+            (void*)object, 
+            free_size,
+            obj_type_to_string[object->type]
+    );
 #endif
 
     switch (object->type) {
+        case OBJ_BOUND_METHOD:
+            FREE(obj_bound_method_t, object);
+            break;
         case OBJ_CLASS: {
+            obj_class_t* klass = (obj_class_t*)object;
+            l_free_table(&klass->methods);
             FREE(obj_class_t, object);
             break;
         } 
@@ -186,6 +299,8 @@ static void _mark_roots() {
 
     // ensure that compiler owned memory is also tracked
     l_mark_compiler_roots();
+
+    l_mark_object((obj_t*)vm.init_string);
 }
 
 static void _trace_references() {

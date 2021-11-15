@@ -3,11 +3,13 @@
 #include "common.h"
 #include "test/bytecode_test.h"
 #include "test/scripts_test.h"
+#include "test/vm_test.h"
 
 int main(int argc, const char* argv[]) {
     printf("Starting lox unit tests...\n");
 
     MunitSuite suites[] = {
+        l_vm_test_setup(),
         l_bytecode_test_setup(),
         l_scripts_test_setup(),
     };

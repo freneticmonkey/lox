@@ -37,6 +37,7 @@ static MunitResult _run_file(const MunitParameter params[], void *user_data)
 MunitSuite l_scripts_test_setup() {
 
     static char* files[] = {
+        "src/test/scripts/classes.lox",
         "src/test/scripts/closure.lox",
         "src/test/scripts/control.lox",
         "src/test/scripts/funcs.lox",
@@ -64,7 +65,7 @@ MunitSuite l_scripts_test_setup() {
     };
 
     return (MunitSuite) {
-        .prefix = (char *)"bytecode/",
+        .prefix = (char *)"scripts/",
         .tests = bytecode_suite_tests,
         .suites = NULL,
         .iterations = 1,
