@@ -430,7 +430,7 @@ static void _call(bool canAssign) {
     _emit_bytes(OP_CALL, argCount);
 }
 
-static void dot(bool canAssign) {
+static void _dot(bool canAssign) {
     _consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
     uint8_t name = _identifier_constant(&_parser.previous);
 
@@ -530,7 +530,7 @@ parse_rule_t rules[] = {
     [TOKEN_LEFT_BRACE]    = {NULL,     NULL,     PREC_NONE}, 
     [TOKEN_RIGHT_BRACE]   = {NULL,     NULL,     PREC_NONE},
     [TOKEN_COMMA]         = {NULL,     NULL,     PREC_NONE},
-    [TOKEN_DOT]           = {NULL,     _dot,     PREC_NONE},
+    [TOKEN_DOT]           = {NULL,     _dot,     PREC_CALL},
     [TOKEN_MINUS]         = {_unary,   _binary,  PREC_TERM},
     [TOKEN_PLUS]          = {NULL,     _binary,  PREC_TERM},
     [TOKEN_SEMICOLON]     = {NULL,     NULL,     PREC_NONE},
