@@ -37,6 +37,7 @@ static MunitResult _run_file(const MunitParameter params[], void *user_data)
 MunitSuite l_scripts_test_setup() {
 
     static char* files[] = {
+        "src/test/scripts/super.lox",
         "src/test/scripts/classes.lox",
         "src/test/scripts/closure.lox",
         "src/test/scripts/control.lox",

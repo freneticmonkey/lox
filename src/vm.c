@@ -27,6 +27,7 @@ static value_t _peek(int distance);
 static bool    _call(obj_closure_t* closure, int argCount);
 static bool    _call_value(value_t callee, int argCount);
 static bool    _invoke(obj_string_t* name, int argCount);
+static bool    _invoke_from_class(obj_class_t* klass, obj_string_t* name, int argCount);
 static bool    _bind_method(obj_class_t* klass, obj_string_t* name);
 
 static obj_upvalue_t* _capture_upvalue(value_t* local);
@@ -233,6 +234,15 @@ static InterpretResult _run() {
                 l_push(value);
                 break;
             }
+            case OP_GET_SUPER: {
+                obj_string_t* name = READ_STRING();
+                obj_class_t* superclass = AS_CLASS(l_pop());
+
+                if (!_bind_method(superclass, name)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                break;
+            }
             case OP_EQUAL: {
                 value_t b = l_pop();
                 value_t a = l_pop();
@@ -307,6 +317,16 @@ static InterpretResult _run() {
                 frame = &vm.frames[vm.frame_count - 1];
                 break;
             }
+            case OP_SUPER_INVOKE: {
+                obj_string_t* method = READ_STRING();
+                int argCount = READ_BYTE();
+                obj_class_t* superclass = AS_CLASS(l_pop());
+                if (!_invoke_from_class(superclass, method, argCount)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                frame = &vm.frames[vm.frame_count - 1];
+                break;
+            }
             case OP_CLOSURE: {
                 obj_function_t* function = AS_FUNCTION(READ_CONSTANT());
                 obj_closure_t*  closure = l_new_closure(function);
@@ -344,6 +364,17 @@ static InterpretResult _run() {
             case OP_CLASS:
                 l_push(OBJ_VAL(l_new_class(READ_STRING())));
                 break;
+            case OP_INHERIT: {
+                value_t superclass = _peek(1);
+                if (!IS_CLASS(superclass)) {
+                    _runtime_error("Superclass must be a class.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                obj_class_t* subclass = AS_CLASS(_peek(0));
+                l_table_add_all(&AS_CLASS(superclass)->methods, &subclass->methods);
+                l_pop(); // Subclass.
+                break;
+            }
             case OP_METHOD:
                 _define_method(READ_STRING());
                 break;
