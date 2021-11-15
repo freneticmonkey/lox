@@ -81,6 +81,11 @@ static void _blacken_object(obj_t* object) {
 #endif
 
     switch (object->type) {
+        case OBJ_CLASS: {
+            obj_class_t* klass = (obj_class_t*)object;
+            l_mark_object((obj_t*)klass->name);
+            break;
+        }
         case OBJ_CLOSURE: {
             obj_closure_t* closure = (obj_closure_t*)object;
             l_mark_object((obj_t*)closure->function);
@@ -93,6 +98,12 @@ static void _blacken_object(obj_t* object) {
             obj_function_t* function = (obj_function_t*)object;
             l_mark_object((obj_t*)function->name);
             l_mark_array(&function->chunk.constants);
+            break;
+        }
+        case OBJ_INSTANCE: {
+            obj_instance_t* instance = (obj_instance_t*)object;
+            l_mark_object((obj_t*)instance->klass);
+            l_mark_table(&instance->fields);
             break;
         }
         case OBJ_UPVALUE:
@@ -110,6 +121,10 @@ static void _free_object(obj_t* object) {
 #endif
 
     switch (object->type) {
+        case OBJ_CLASS: {
+            FREE(obj_class_t, object);
+            break;
+        } 
         case OBJ_CLOSURE: {
             obj_closure_t* closure = (obj_closure_t*)object;
             FREE_ARRAY(obj_upvalue_t*, closure->upvalues, closure->upvalue_count);
@@ -120,6 +135,12 @@ static void _free_object(obj_t* object) {
             obj_function_t* function = (obj_function_t*)object;
             l_free_chunk(&function->chunk);
             FREE(obj_function_t, object);
+            break;
+        }
+        case OBJ_INSTANCE: {
+            obj_instance_t* instance = (obj_instance_t *)object;
+            l_free_table(&instance->fields);
+            FREE(obj_instance_t, object);
             break;
         }
         case OBJ_NATIVE: {

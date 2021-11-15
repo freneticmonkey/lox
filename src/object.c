@@ -23,7 +23,20 @@ static obj_t* _allocate_object(size_t size, ObjType type) {
     return object;
 }
 
-obj_closure_t*  l_new_closure(obj_function_t* function) {
+obj_class_t* l_new_class(obj_string_t* name) {
+    obj_class_t* klass = ALLOCATE_OBJ(obj_class_t, OBJ_CLASS);
+    klass->name = name;
+    return klass;
+}
+
+obj_instance_t* l_new_instance(obj_class_t* klass) {
+    obj_instance_t* instance = ALLOCATE_OBJ(obj_instance_t, OBJ_INSTANCE);
+    instance->klass = klass;
+    l_init_table(&instance->fields);
+    return instance;
+}
+
+obj_closure_t* l_new_closure(obj_function_t* function) {
     obj_upvalue_t** upvalues = ALLOCATE(obj_upvalue_t*, function->upvalue_count);
     for (int i = 0; i < function->upvalue_count; i++) {
         upvalues[i] = NULL;
@@ -114,11 +127,17 @@ static void _print_function(obj_function_t* function) {
 
 void l_print_object(value_t value) {
     switch (OBJ_TYPE(value)) {
+        case OBJ_CLASS:
+            printf("class %s", AS_CLASS(value)->name->chars);
+        break;
         case OBJ_CLOSURE:
             _print_function(AS_CLOSURE(value)->function);
             break;
         case OBJ_FUNCTION:
             _print_function(AS_FUNCTION(value));
+            break;
+        case OBJ_INSTANCE:
+            printf("%s instance", AS_INSTANCE(value)->klass->name->chars);
             break;
         case OBJ_NATIVE:
             printf("<native fn>");

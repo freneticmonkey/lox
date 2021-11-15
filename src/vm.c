@@ -191,6 +191,38 @@ static InterpretResult _run() {
                 *frame->closure->upvalues[slot]->location = _peek(0);
                 break;
             }
+            case OP_GET_PROPERTY: {
+                if (!IS_INSTANCE(_peek(0))) {
+                    _runtime_error("Only instances have properties.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+
+                obj_instance_t* instance = AS_INSTANCE(_peek(0));
+                obj_string_t* name = READ_STRING();
+
+                value_t value;
+                if (l_table_get(&instance->fields, name, &value)) {
+                    l_pop(); // Instance.
+                    l_push(value);
+                    break;
+                }
+
+                _runtime_error("Undefined property '%s'.", name->chars);
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            case OP_SET_PROPERTY: {
+                if (!IS_INSTANCE(_peek(1))) {
+                    _runtime_error("Only instances have properties.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+
+                obj_instance_t* instance = AS_INSTANCE(_peek(1));
+                l_table_set(&instance->fields, READ_STRING(), _peek(0));
+                value_t value = l_pop();
+                l_pop();
+                l_push(value);
+                break;
+            }
             case OP_EQUAL: {
                 value_t b = l_pop();
                 value_t a = l_pop();
@@ -290,6 +322,9 @@ static InterpretResult _run() {
                 frame = &vm.frames[vm.frame_count - 1];
                 break;
             }
+            case OP_CLASS:
+                l_push(OBJ_VAL(l_new_class(READ_STRING())));
+            break;
         }
     }
 
@@ -363,6 +398,11 @@ static bool _call(obj_closure_t* closure, int argCount) {
 static bool _call_value(value_t callee, int argCount) {
     if (IS_OBJ(callee)) {
         switch (OBJ_TYPE(callee)) {
+            case OBJ_CLASS: {
+                obj_class_t* klass = AS_CLASS(callee);
+                vm.stack_top[-argCount - 1] = OBJ_VAL(l_new_instance(klass));
+                return true;
+            }
             case OBJ_CLOSURE:
                 return _call(AS_CLOSURE(callee), argCount);
             case OBJ_NATIVE: {
@@ -433,6 +473,6 @@ static void _concatenate() {
 
     l_pop();
     l_pop();
-    
+
     l_push(OBJ_VAL(result));
 }

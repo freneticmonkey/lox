@@ -430,6 +430,18 @@ static void _call(bool canAssign) {
     _emit_bytes(OP_CALL, argCount);
 }
 
+static void dot(bool canAssign) {
+    _consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
+    uint8_t name = _identifier_constant(&_parser.previous);
+
+    if (canAssign && _match(TOKEN_EQUAL)) {
+        _expression();
+        _emit_bytes(OP_SET_PROPERTY, name);
+    } else {
+        _emit_bytes(OP_GET_PROPERTY, name);
+    }
+}
+
 static void _literal(bool canAssign) {
     switch (_parser.previous.type) {
         case TOKEN_FALSE: _emit_byte(OP_FALSE); break;
@@ -518,7 +530,7 @@ parse_rule_t rules[] = {
     [TOKEN_LEFT_BRACE]    = {NULL,     NULL,     PREC_NONE}, 
     [TOKEN_RIGHT_BRACE]   = {NULL,     NULL,     PREC_NONE},
     [TOKEN_COMMA]         = {NULL,     NULL,     PREC_NONE},
-    [TOKEN_DOT]           = {NULL,     NULL,     PREC_NONE},
+    [TOKEN_DOT]           = {NULL,     _dot,     PREC_NONE},
     [TOKEN_MINUS]         = {_unary,   _binary,  PREC_TERM},
     [TOKEN_PLUS]          = {NULL,     _binary,  PREC_TERM},
     [TOKEN_SEMICOLON]     = {NULL,     NULL,     PREC_NONE},
@@ -624,6 +636,18 @@ static void _function(FunctionType type) {
         _emit_byte(compiler.upvalues[i].is_local ? 1 : 0);
         _emit_byte(compiler.upvalues[i].index);
     }
+}
+
+static void _class_declaration() {
+    _consume(TOKEN_IDENTIFIER, "Expect class name.");
+    uint8_t nameConstant = _identifier_constant(&_parser.previous);
+    _declare_variable();
+
+    _emit_bytes(OP_CLASS, nameConstant);
+    _define_variable(nameConstant);
+
+    _consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+    _consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
 }
 
 static void _fun_declaration() {
@@ -793,7 +817,9 @@ static void _synchronize() {
 
 static void _declaration() {
 
-    if ( _match(TOKEN_FUN) ) {
+    if ( _match(TOKEN_CLASS) ) {
+        _class_declaration();
+    } else if ( _match(TOKEN_FUN) ) {
         _fun_declaration();
     } else if ( _match(TOKEN_VAR) ) {
         _var_declaration();
