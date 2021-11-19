@@ -20,6 +20,7 @@ implementation of the lox interpreter as described on http://craftinginterpreter
 [ ] local var aliasing across scopes
 [ ] duplicate variable definition
 [ ] File parsing
+[ ] Run each script in the scripts folder without errors
 
 ## Future Language features
 [ ] Defer
@@ -33,9 +34,15 @@ implementation of the lox interpreter as described on http://craftinginterpreter
 [ ] impl break
 [ ] impl continue
 [ ] run scripts from repl
+[ ] default parameter values
 
 ## Advanced language features
 [ ] interfaces
 [ ] coroutines
 [ ] Debugger?
 
+
+## Things to better understand
+- Rule parsing - precidence logic
+- max number of up values (256) - per function or program?
+- 
